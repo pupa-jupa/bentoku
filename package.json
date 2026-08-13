@@ -1,0 +1,38 @@
+{
+  "name": "bentoku",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A cozy kawaii bento deduction puzzle for the browser.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "assets:build": "node scripts/build-runtime-assets.mjs",
+    "assets:verify": "node scripts/verify-lossless-webp.mjs"
+  },
+  "dependencies": {
+    "phaser": "4.2.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.2.1",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.3.0",
+    "prettier": "^3.6.2",
+    "sharp": "^0.34.3",
+    "typescript": "^6.0.1",
+    "typescript-eslint": "^8.39.1",
+    "vite": "8.1.5",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.28.2"
+}

@@ -1,0 +1,10 @@
+Use case: stylized-concept
+Asset type: isolated production 2D game piece
+Primary request: one {FOOD} bento food whose natural edible form creates a clearly recognizable {ANIMAL} face and silhouette
+Reference role: use the supplied cat-rice anchor as the visual reference for camera, scale, face proportions, palette, tactile material language, and lighting; preserve those invariants while changing only the requested animal and food
+Style/medium: clean HD hand-painted miniature food-toy illustration, compact and rounded, food first and animal second, no pixel art
+Composition/framing: exactly one centered object, entire object inside the central 68% safe area, generous flat magenta padding on every side
+Scene/backdrop: perfectly flat solid #FF00FF chroma-key background for local removal; absolutely uniform color with no gradient, texture, shadows, floor plane, or reflections
+Lighting/mood: warm diffuse upper-left light on the object only; no cast or contact shadow on the background
+Constraints: same scale and three-quarter top-down camera as reference, crisp silhouette at 64–80 px, no #FF00FF in the subject, no text, no watermark, no frame, no plate, no props, no other food, no detached effects
+Avoid: photorealism, chibi anime, huge eyes, glossy mobile-game finish, Pixar-like exaggeration, clothing, costume, bows, accessories

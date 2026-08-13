@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: 3 × 3 production game glyph pack for café order-note clues
+Layout: row 1 cat, bear, pig; row 2 bunny, egg, rice; row 3 sandwich, sakura flower, two-leaf sprig
+Style: simplified charming brown-ink doodles with restrained pastel fills, thick enough to read at 32–40 px, consistent line weight
+Grid: exact 3 × 3 invisible cells, centered and contained, no visible guides or borders
+Background: perfectly flat solid #FF00FF chroma key
+Constraints: exactly nine glyphs, no text, no watermark, no extra objects

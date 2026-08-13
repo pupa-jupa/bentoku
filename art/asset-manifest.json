@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "styleAnchor": "art/references/style-anchor.png",
+  "pieceAnchor": "art/references/cat-rice-anchor.png",
+  "pieces": [
+    "cat_egg",
+    "cat_rice",
+    "cat_sandwich",
+    "bear_egg",
+    "bear_rice",
+    "bear_sandwich",
+    "pig_egg",
+    "pig_rice",
+    "pig_sandwich",
+    "bunny_egg",
+    "bunny_rice",
+    "bunny_sandwich"
+  ],
+  "clueGlyphs": ["cat", "bear", "pig", "bunny", "egg", "rice", "sandwich"],
+  "environment": ["background_surface", "clue_paper"],
+  "ui": ["success_stamp", "paper_tape", "tiny_flower", "tiny_leaf"],
+  "processing": {
+    "sourceDirectory": "art/user-assets",
+    "backgroundRemoval": false,
+    "preserveSourceCanvas": true,
+    "runtimeFormat": "webp-lossless",
+    "verification": "decoded RGBA pixel equality"
+  }
+}

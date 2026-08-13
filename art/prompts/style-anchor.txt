@@ -1,0 +1,12 @@
+Use case: ui-mockup
+Asset type: visual style anchor and full-interface concept frame for a browser puzzle game
+Primary request: a complete cozy kawaii bento deduction puzzle scene with a 3 × 3 pale maple bento box in the center, a peach padded tray containing twelve tiny animal-shaped food pieces on the left, and a pale mint café order note with small spatial clue sketches on the right
+Scene/backdrop: warm cream Japanese café tabletop with subtle linen/paper grain and a few restrained stationery details
+Subject: inventory | bento box | clue note, balanced as one calm landscape composition
+Style/medium: clean HD hand-painted 2D game concept, tactile handmade food miniatures, shippable cozy indie-game visual target rather than loose concept art
+Composition/framing: wide 16:9 desktop game view, gentle three-quarter top-down camera, generous margins, no lower adventure HUD
+Lighting/mood: warm diffuse daylight from upper left, soft contact shadows, quiet and welcoming
+Color palette: warm cream, milk white, soft peach, blush pink, pale mint, sage, honey beige, caramel, walnut, muted strawberry
+Materials/textures: maple wood, fibrous paper, padded fabric, rice grains, smooth egg, fluffy toasted bread
+Constraints: no legible text, no logo, no watermark, no characters outside the food, exactly three major columns, no phone UI, no dark dashboard panels
+Avoid: generic mobile-puzzle UI, SaaS cards, neon, glossy gacha polish, anime, Pixar-like 3D, photorealism, visual clutter

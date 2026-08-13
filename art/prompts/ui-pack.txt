@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: 2 × 2 compact Bentoku café-stationery decoration pack
+Layout: row 1 success stamp, paper tape; row 2 golden sparkle, mint sakura seal
+Style: tactile paper and ink, clean HD hand-painted, restrained pastel palette
+Grid: exact 2 × 2 invisible cells, one centered object per cell, no visible borders
+Background: perfectly flat solid #FF00FF chroma key
+Constraints: no text, no watermark, exactly four objects, no extras

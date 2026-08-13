@@ -1,0 +1,10 @@
+Use case: stylized-concept
+Asset type: production 2D game asset for Bentoku
+Style/medium: clean HD hand-painted miniature food-toy illustration, tactile handmade clay/mochi/rice/bread materials, crisp readable silhouette, low texture noise, no pixel art
+View: consistent gentle three-quarter top-down view, around 25–30 degrees above the subject
+Lighting/mood: warm diffuse studio daylight from upper left, softly rolled highlights, calm cozy mood
+Color palette: warm cream, milk white, soft peach, blush pink, pale mint, sage, honey beige, light caramel, warm walnut, muted strawberry
+Face language: two tiny dark-brown seed eyes, one tiny restrained mouth, two small low-saturation blush dots; cute but not anime
+Visual goal: premium cozy indie game, tiny Japanese café, handmade edible toy; food first and animal second
+Constraints: centered, one object only, generous padding, readable at 64–80 px, consistent silhouette scale and camera, no text, no watermark, no frame, no props, no other food
+Avoid: photorealism, gacha gloss, Pixar-like 3D exaggeration, chibi anime proportions, huge eyes, neon, hard black outlines, extra accessories, clothing, bows

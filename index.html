@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f8e9d4" />
+    <link rel="icon" type="image/webp" href="./assets/ui/sakura_seal.webp" />
+    <meta
+      name="description"
+      content="Bentoku — a gentle spatial deduction puzzle about arranging tiny kawaii bento friends."
+    />
+    <title>Bentoku — A Cozy Bento Puzzle</title>
+  </head>
+  <body>
+    <main id="app" aria-label="Bentoku game">
+      <div id="game" role="application" aria-label="Bentoku puzzle board"></div>
+      <div id="a11y-status" class="sr-only" aria-live="polite"></div>
+      <div id="rotate-device" aria-hidden="true">
+        <div class="rotate-card">
+          <span class="rotate-mark" aria-hidden="true">↻</span>
+          <h1>Turn your tray</h1>
+          <p>Bentoku feels coziest in landscape.</p>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

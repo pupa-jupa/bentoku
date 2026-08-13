@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.vite/
+.playwright-cli/
+*.tsbuildinfo
+output/
+test-results/
+playwright-report/
+art/legacy-public-assets/
+art/generations/
+.env
+.env.*
+!.env.example

@@ -1,0 +1,7 @@
+art/generations/
+art/legacy-public-assets/
+pnpm-lock.yaml
+dist/
+output/
+test-results/
+.playwright-cli/

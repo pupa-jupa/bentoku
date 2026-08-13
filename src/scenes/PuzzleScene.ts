@@ -112,7 +112,9 @@ export class PuzzleScene extends Phaser.Scene {
 
     this.inventory = new InventoryPanel(this, 285, 465);
     this.bento = new BentoBoard(this, 790, 429);
-    new CluePanel(this, 1372, 485, this.puzzle.clues);
+    // Center the dynamic notes on the illustrated paper, whose visual center
+    // sits left of the right-hand layout column.
+    new CluePanel(this, 1332, 485, this.puzzle.clues);
 
     this.puzzle.pieces.forEach((piece, index) => {
       const position = this.inventory.trayPosition(index);

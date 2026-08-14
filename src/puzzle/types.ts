@@ -89,6 +89,7 @@ export interface PuzzleDefinition {
 
 export interface PlayerSettings {
   sound: boolean;
+  musicVolume: number;
   reducedMotion: boolean;
   hintMode: boolean;
   difficulty: Difficulty;

@@ -8,11 +8,16 @@ import {
 } from '../puzzle/types';
 
 const STORAGE_KEY = 'bentoku.save.v1';
+const DEFAULT_MUSIC_VOLUME = 0.35;
+
+const clampMusicVolume = (value: unknown, fallback = DEFAULT_MUSIC_VOLUME): number =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;
 
 const defaults = (): SaveData => ({
   version: 1,
   settings: {
     sound: true,
+    musicVolume: DEFAULT_MUSIC_VOLUME,
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     hintMode: true,
     difficulty: 'Gentle',
@@ -37,6 +42,10 @@ export class SaveService {
         settings: {
           ...defaults().settings,
           ...parsed.settings,
+          musicVolume: clampMusicVolume(
+            parsed.settings?.musicVolume,
+            parsed.settings?.sound === false ? 0 : DEFAULT_MUSIC_VOLUME,
+          ),
           difficulty: parseDifficulty(parsed.settings?.difficulty) ?? 'Gentle',
         },
         stats: { ...defaults().stats, ...parsed.stats },
@@ -88,7 +97,11 @@ export class SaveService {
   }
 
   updateSettings(settings: Partial<PlayerSettings>): PlayerSettings {
-    this.data.settings = { ...this.data.settings, ...settings };
+    this.data.settings = {
+      ...this.data.settings,
+      ...settings,
+      musicVolume: clampMusicVolume(settings.musicVolume, this.data.settings.musicVolume),
+    };
     this.persist();
     return this.settings;
   }

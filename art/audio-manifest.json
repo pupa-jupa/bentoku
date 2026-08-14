@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "music": {
+    "processing": {
+      "codec": "MP3",
+      "bitrateKbps": 128,
+      "sampleRateHz": 48000,
+      "channels": 2,
+      "targetIntegratedLufs": -16.5,
+      "runtimeDirectory": "public/assets/music"
+    },
+    "tracks": [
+      {
+        "key": "music_sunlit_puzzle",
+        "source": "Sunlit Puzzle.mp3",
+        "sourceSha256": "0F6DF8270B93A2864E2CE97DFEFB5CBB1C77776EDF720BA7A06FF7260ED41385",
+        "runtime": "sunlit_puzzle.mp3",
+        "durationSeconds": 59.86,
+        "integratedLufs": -16.4
+      },
+      {
+        "key": "music_paper_lantern_logic",
+        "source": "Paper Lantern Logic.mp3",
+        "sourceSha256": "4A810A10C6A61C7915E827F65AF11AB39F260FDCCC0CCAFE2E3C37B14B77481A",
+        "runtime": "paper_lantern_logic.mp3",
+        "durationSeconds": 182.28,
+        "integratedLufs": -16.5
+      },
+      {
+        "key": "music_bossa_nova",
+        "source": "Bossa Nova.mp3",
+        "sourceSha256": "99E2572111D01B985D6DE5F2BCFC986758BF9835E67D531E92C155B06B59973C",
+        "runtime": "bossa_nova.mp3",
+        "durationSeconds": 199.32,
+        "integratedLufs": -16.5
+      },
+      {
+        "key": "music_paper_lantern_logic_short",
+        "source": "Paper Lantern Logic (2).mp3",
+        "sourceSha256": "9D48397E7A4FB3356E3B7A098E46427F2C1B786B10258915FDE59AE5F46C8E69",
+        "runtime": "paper_lantern_logic_short.mp3",
+        "durationSeconds": 40.92,
+        "integratedLufs": -16.4
+      }
+    ],
+    "duplicatesOmitted": [
+      {
+        "source": "Sunlit Puzzle (1).mp3",
+        "duplicateOf": "Sunlit Puzzle.mp3",
+        "sha256": "0F6DF8270B93A2864E2CE97DFEFB5CBB1C77776EDF720BA7A06FF7260ED41385"
+      }
+    ]
+  }
+}

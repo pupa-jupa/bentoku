@@ -1,7 +1,12 @@
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { clueAssets, environmentAssets, pieceAssets } from '../src/services/AssetRegistry';
+import {
+  clueAssets,
+  environmentAssets,
+  musicAssets,
+  pieceAssets,
+} from '../src/services/AssetRegistry';
 
 const runtimeAssets = [...pieceAssets, ...clueAssets, ...environmentAssets];
 
@@ -26,5 +31,16 @@ describe('production assets', () => {
   it('contains no raw PNG or JPEG files in the public runtime tree', () => {
     const rawImages = walk('public').filter((file) => /\.(png|jpe?g)$/i.test(file));
     expect(rawImages).toEqual([]);
+  });
+
+  it('registers four compressed music tracks that exist', () => {
+    expect(musicAssets).toHaveLength(4);
+    for (const asset of musicAssets) {
+      const file = path.join('public', asset.path);
+      expect(asset.path.endsWith('.mp3'), asset.path).toBe(true);
+      expect(walk('public').map((entry) => entry.replaceAll('\\', '/'))).toContain(
+        file.replaceAll('\\', '/'),
+      );
+    }
   });
 });

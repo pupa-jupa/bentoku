@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 interface SceneState {
   selectedPiece: string | null;
+  settings: { musicVolume: number };
   placement: { board: Array<string | null>; moves: number };
   puzzle: { solution: string[]; difficulty: string };
   solved: boolean;
@@ -24,6 +25,18 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await expect(page.locator('canvas')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (
+          window as unknown as {
+            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+          }
+        ).__BENTOKU_GAME__;
+        return Boolean(game?.scene.getScene('PuzzleScene')?.puzzle);
+      }),
+    )
+    .toBe(true);
 });
 
 test('loads only WebP artwork without console errors', async ({ page }) => {
@@ -34,6 +47,18 @@ test('loads only WebP artwork without console errors', async ({ page }) => {
   });
   await page.reload();
   await page.waitForLoadState('networkidle');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (
+          window as unknown as {
+            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+          }
+        ).__BENTOKU_GAME__;
+        return Boolean(game?.scene.getScene('PuzzleScene')?.puzzle);
+      }),
+    )
+    .toBe(true);
   const requests = await page.evaluate(() =>
     performance
       .getEntriesByType('resource')
@@ -45,6 +70,22 @@ test('loads only WebP artwork without console errors', async ({ page }) => {
   expect(requests.length).toBe(24);
   expect(requests.every((name) => name.endsWith('.webp'))).toBe(true);
   expect(errors).toEqual([]);
+  const musicRequests = await page.evaluate(() =>
+    performance
+      .getEntriesByType('resource')
+      .map((entry) => new URL(entry.name).pathname)
+      .filter((name) => name.startsWith('/assets/music/')),
+  );
+  expect(musicRequests).toEqual(['/assets/music/sunlit_puzzle.mp3']);
+  const defaultMusicVolume = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+        }
+      ).__BENTOKU_GAME__.scene.getScene('PuzzleScene').settings.musicVolume,
+  );
+  expect(defaultMusicVolume).toBe(0.35);
 });
 
 test('supports drag, undo, tap placement, and a complete winning run', async ({ page }) => {

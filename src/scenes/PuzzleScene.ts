@@ -18,6 +18,8 @@ import {
   type PuzzleDefinition,
 } from '../puzzle/types';
 import { AudioService } from '../services/AudioService';
+import { musicAssets } from '../services/AssetRegistry';
+import { MusicService } from '../services/MusicService';
 import { SaveService } from '../services/SaveService';
 import { BentoBoard } from '../views/BentoBoard';
 import { CelebrationView } from '../views/CelebrationView';
@@ -43,10 +45,17 @@ interface PiecePress {
   moved: boolean;
 }
 
+interface SliderSpec {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}
+
 export class PuzzleScene extends Phaser.Scene {
   private generator = new PuzzleGenerator();
   private save!: SaveService;
   private audio!: AudioService;
+  private music!: MusicService;
   private settings!: PlayerSettings;
   private puzzle!: PuzzleDefinition;
   private puzzleController!: PuzzleController;
@@ -72,6 +81,7 @@ export class PuzzleScene extends Phaser.Scene {
     this.save = new SaveService();
     this.settings = this.save.settings;
     this.audio = new AudioService(this.settings);
+    this.music = new MusicService(this, musicAssets, this.settings.musicVolume);
     const params = new URLSearchParams(window.location.search);
     const difficulty =
       parseDifficulty(params.get('difficulty')) ??
@@ -258,6 +268,7 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private bindInput(): void {
+    this.input.once('pointerdown', () => this.music.start());
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (!this.selectedPiece || this.dragging || this.modal || this.solved) return;
       const slot = this.bento.nearestSlot(pointer.worldX, pointer.worldY);
@@ -315,6 +326,7 @@ export class PuzzleScene extends Phaser.Scene {
     });
 
     const keyboard = this.input.keyboard;
+    keyboard?.once('keydown', () => this.music.start());
     keyboard?.on('keydown-H', () => this.openHelp());
     keyboard?.on('keydown-U', () => this.undo());
     keyboard?.on('keydown-S', () => this.openSettings());
@@ -544,36 +556,50 @@ export class PuzzleScene extends Phaser.Scene {
 
   private openSettings(): void {
     if (this.solved) return;
-    this.openModal('Cozy settings', 'Tune the room to feel just right.', [
+    this.openModal(
+      'Cozy settings',
+      'Tune the room to feel just right.',
+      [
+        {
+          label: `Effects: ${this.settings.sound ? 'on' : 'off'}`,
+          callback: () => {
+            this.settings = this.save.updateSettings({ sound: !this.settings.sound });
+            this.audio.setEnabled(this.settings.sound);
+            this.closeModal();
+            this.openSettings();
+          },
+        },
+        {
+          label: `Motion: ${this.settings.reducedMotion ? 'reduced' : 'gentle'}`,
+          callback: () => {
+            this.settings = this.save.updateSettings({
+              reducedMotion: !this.settings.reducedMotion,
+            });
+            this.closeModal();
+            this.openSettings();
+          },
+        },
+        {
+          label: 'Restart tray',
+          callback: () => {
+            this.closeModal();
+            this.placement.restart();
+            this.updatePiecePositions(true);
+            this.updateStatus();
+            this.saveCurrent();
+          },
+        },
+        { label: 'New random', callback: () => this.startRandom() },
+      ],
       {
-        label: `Sound: ${this.settings.sound ? 'on' : 'off'}`,
-        callback: () => {
-          this.settings = this.save.updateSettings({ sound: !this.settings.sound });
-          this.audio.setEnabled(this.settings.sound);
-          this.closeModal();
-          this.openSettings();
+        label: 'Music',
+        value: this.settings.musicVolume,
+        onChange: (musicVolume) => {
+          this.settings = this.save.updateSettings({ musicVolume });
+          this.music.setVolume(this.settings.musicVolume);
         },
       },
-      {
-        label: `Motion: ${this.settings.reducedMotion ? 'reduced' : 'gentle'}`,
-        callback: () => {
-          this.settings = this.save.updateSettings({ reducedMotion: !this.settings.reducedMotion });
-          this.closeModal();
-          this.openSettings();
-        },
-      },
-      {
-        label: 'Restart tray',
-        callback: () => {
-          this.closeModal();
-          this.placement.restart();
-          this.updatePiecePositions(true);
-          this.updateStatus();
-          this.saveCurrent();
-        },
-      },
-      { label: 'New random', callback: () => this.startRandom() },
-    ]);
+    );
   }
 
   private openDifficultySelect(): void {
@@ -606,12 +632,13 @@ export class PuzzleScene extends Phaser.Scene {
     titleText: string,
     bodyText: string,
     actions: Array<{ label: string; callback: () => void; primary?: boolean }>,
+    slider?: SliderSpec,
   ): void {
     this.closeModal();
     const modal = this.add.container(800, 450).setDepth(2600);
     const shade = this.add.rectangle(0, 0, 1600, 900, COLORS.walnut, 0.26).setInteractive();
     const card = this.add.graphics();
-    const height = Math.max(330, 240 + Math.ceil(actions.length / 2) * 62);
+    const height = Math.max(330, 240 + Math.ceil(actions.length / 2) * 62) + (slider ? 96 : 0);
     card.fillStyle(COLORS.shadow, 0.17);
     card.fillRoundedRect(-312, -height / 2 + 12, 640, height, 38);
     card.fillStyle(COLORS.milk, 1);
@@ -637,6 +664,7 @@ export class PuzzleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     modal.add([shade, card, title, body]);
+    if (slider) this.makeSlider(modal, -height / 2 + 218, slider);
     actions.forEach((action, index) => {
       const columns = actions.length === 1 ? 1 : 2;
       const column = index % columns;
@@ -666,6 +694,51 @@ export class PuzzleScene extends Phaser.Scene {
     modal.setAlpha(0).setScale(0.96);
     this.tweens.add({ targets: modal, alpha: 1, scale: 1, duration: 180, ease: 'Sine.easeOut' });
     this.modal = modal;
+  }
+
+  private makeSlider(parent: Phaser.GameObjects.Container, y: number, spec: SliderSpec): void {
+    const width = 360;
+    let value = Phaser.Math.Clamp(spec.value, 0, 1);
+    const label = this.add
+      .text(0, y - 22, '', {
+        fontFamily: FONT_BODY,
+        fontSize: '17px',
+        fontStyle: 'bold',
+        color: '#6f554d',
+      })
+      .setOrigin(0.5);
+    const visual = this.add.graphics().setPosition(0, y + 14);
+    const zone = this.add.zone(0, y + 14, width + 50, 54).setInteractive({ useHandCursor: true });
+
+    const redraw = (): void => {
+      label.setText(
+        value === 0 ? `${spec.label}: off` : `${spec.label}: ${Math.round(value * 100)}%`,
+      );
+      visual.clear();
+      visual.fillStyle(COLORS.sage, 0.22);
+      visual.fillRoundedRect(-width / 2, -5, width, 10, 5);
+      if (value > 0) {
+        visual.fillStyle(COLORS.coral, 0.82);
+        visual.fillRoundedRect(-width / 2, -5, width * value, 10, 5);
+      }
+      visual.fillStyle(COLORS.milk, 1);
+      visual.fillCircle(-width / 2 + width * value, 0, 14);
+      visual.lineStyle(3, COLORS.coral, 0.88);
+      visual.strokeCircle(-width / 2 + width * value, 0, 14);
+    };
+    const updateFromPointer = (pointer: Phaser.Input.Pointer): void => {
+      value = Phaser.Math.Clamp((pointer.worldX - (parent.x - width / 2)) / width, 0, 1);
+      value = Math.round(value * 100) / 100;
+      redraw();
+      spec.onChange(value);
+    };
+
+    zone.on('pointerdown', updateFromPointer);
+    zone.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.isDown) updateFromPointer(pointer);
+    });
+    redraw();
+    parent.add([label, visual, zone]);
   }
 
   private showMessage(title: string, message: string): void {

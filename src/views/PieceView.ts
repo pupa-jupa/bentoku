@@ -115,3 +115,7 @@ const VISUAL_LAYOUT: Record<BentoPiece['id'], { size: number; x: number; y: numb
   pig_rice: { size: 202, x: -4, y: -7 },
   pig_sandwich: { size: 209, x: -4, y: -11 },
 };
+
+export const getPieceVisualLayout = (
+  pieceId: BentoPiece['id'],
+): Readonly<{ size: number; x: number; y: number }> => VISUAL_LAYOUT[pieceId];

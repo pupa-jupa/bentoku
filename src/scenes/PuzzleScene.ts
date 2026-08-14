@@ -25,7 +25,7 @@ import { BentoBoard } from '../views/BentoBoard';
 import { CelebrationView } from '../views/CelebrationView';
 import { CluePanel } from '../views/CluePanel';
 import { InventoryPanel } from '../views/InventoryPanel';
-import { PieceView } from '../views/PieceView';
+import { getPieceVisualLayout, PieceView } from '../views/PieceView';
 
 interface ButtonSpec {
   x: number;
@@ -608,7 +608,7 @@ export class PuzzleScene extends Phaser.Scene {
             if (index !== null) {
               this.audio.play('hint_reveal');
               this.showHintReveal(index);
-              this.announce(`A helpful glow marks cell ${index + 1}.`);
+              this.announce(`A ghost piece shows what belongs in cell ${index + 1}.`);
             }
           },
           sound: false,
@@ -775,38 +775,69 @@ export class PuzzleScene extends Phaser.Scene {
 
   private showHintReveal(index: number): void {
     const slot = this.bento.slots[index];
-    if (!slot) return;
+    const pieceId = this.puzzle.solution[index];
+    if (!slot || !pieceId) return;
+    const piece = this.pieces.get(pieceId)?.piece;
+    if (!piece) return;
+
     const position = this.bento.slotWorldPosition(index);
     slot.setHighlighted(true, true);
 
-    const ring = this.add.graphics().setPosition(position.x, position.y).setDepth(2200);
-    ring.fillStyle(COLORS.honey, 0.16);
+    const overlay = this.add
+      .container(position.x, position.y)
+      .setDepth(2200)
+      .setName('hint-reveal');
+    const ring = this.add.graphics();
+    ring.fillStyle(COLORS.milk, 0.78);
     ring.fillRoundedRect(-76, -76, 152, 152, 28);
     ring.lineStyle(7, COLORS.honey, 0.96);
     ring.strokeRoundedRect(-76, -76, 152, 152, 28);
-    ring.setScale(0.92).setAlpha(0).setName('hint-reveal');
-    this.tweens.add({
-      targets: ring,
-      scale: 1,
-      alpha: 1,
-      duration: 180,
-      ease: 'Sine.easeOut',
-      onComplete: () => {
-        if (!ring.active) return;
-        this.tweens.add({
-          targets: ring,
-          scale: 1.035,
-          alpha: 0.38,
-          duration: 360,
-          yoyo: true,
-          repeat: 4,
-          ease: 'Sine.easeInOut',
-        });
-      },
-    });
+
+    const visual = getPieceVisualLayout(pieceId);
+    const ghost = this.add
+      .image(visual.x, visual.y, piece.textureKey)
+      .setDisplaySize(visual.size, visual.size)
+      .setAlpha(0.78)
+      .setName('hint-piece-image');
+    const ghostWobble = this.add.container(0, 0, ghost).setName('hint-piece');
+    overlay.add([ring, ghostWobble]);
+
+    if (this.settings.reducedMotion) {
+      overlay.setScale(1).setAlpha(1);
+    } else {
+      overlay.setScale(0.92).setAlpha(0);
+      this.tweens.add({
+        targets: overlay,
+        scale: 1,
+        alpha: 1,
+        duration: 180,
+        ease: 'Sine.easeOut',
+        onComplete: () => {
+          if (!overlay.active) return;
+          this.tweens.add({
+            targets: overlay,
+            scale: 1.018,
+            duration: 420,
+            yoyo: true,
+            repeat: 3,
+            ease: 'Sine.easeInOut',
+          });
+          this.tweens.add({
+            targets: ghostWobble,
+            angle: { from: -1.5, to: 1.5 },
+            scaleY: { from: 1, to: 0.975 },
+            duration: 420,
+            yoyo: true,
+            repeat: 3,
+            ease: 'Sine.easeInOut',
+          });
+        },
+      });
+    }
+
     this.time.delayedCall(4000, () => {
       if (slot.active) slot.setHighlighted(false);
-      if (ring.active) ring.destroy();
+      if (overlay.active) overlay.destroy();
     });
   }
 

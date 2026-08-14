@@ -1,4 +1,11 @@
-import { emptyBoard, toBoard, type PlayerSettings, type SaveData } from '../puzzle/types';
+import { parseDifficulty } from '../puzzle/DifficultyEvaluator';
+import {
+  emptyBoard,
+  toBoard,
+  type Difficulty,
+  type PlayerSettings,
+  type SaveData,
+} from '../puzzle/types';
 
 const STORAGE_KEY = 'bentoku.save.v1';
 
@@ -8,6 +15,7 @@ const defaults = (): SaveData => ({
     sound: true,
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     hintMode: true,
+    difficulty: 'Gentle',
   },
   stats: { solved: 0 },
 });
@@ -26,7 +34,11 @@ export class SaveService {
       return {
         ...defaults(),
         ...parsed,
-        settings: { ...defaults().settings, ...parsed.settings },
+        settings: {
+          ...defaults().settings,
+          ...parsed.settings,
+          difficulty: parseDifficulty(parsed.settings?.difficulty) ?? 'Gentle',
+        },
         stats: { ...defaults().stats, ...parsed.stats },
       };
     } catch {
@@ -50,14 +62,28 @@ export class SaveService {
     return this.data.currentPuzzle?.seed;
   }
 
-  loadPuzzle(seed: string): { board: ReturnType<typeof emptyBoard>; moves: number } {
+  get currentDifficulty(): Difficulty | undefined {
+    return parseDifficulty(this.data.currentPuzzle?.difficulty);
+  }
+
+  loadPuzzle(
+    seed: string,
+    difficulty: Difficulty,
+  ): { board: ReturnType<typeof emptyBoard>; moves: number } {
     const current = this.data.currentPuzzle;
-    if (!current || current.seed !== seed) return { board: emptyBoard(), moves: 0 };
+    if (!current || current.seed !== seed || current.difficulty !== difficulty) {
+      return { board: emptyBoard(), moves: 0 };
+    }
     return { board: toBoard(current.board), moves: current.moves };
   }
 
-  savePuzzle(seed: string, board: ReturnType<typeof emptyBoard>, moves: number): void {
-    this.data.currentPuzzle = { seed, board: toBoard(board), moves };
+  savePuzzle(
+    seed: string,
+    difficulty: Difficulty,
+    board: ReturnType<typeof emptyBoard>,
+    moves: number,
+  ): void {
+    this.data.currentPuzzle = { seed, difficulty, board: toBoard(board), moves };
     this.persist();
   }
 

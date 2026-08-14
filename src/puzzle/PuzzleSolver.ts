@@ -1,8 +1,10 @@
 import { boardSatisfiesPuzzle, clueCouldMatch, pieceMatchesCell } from './ConstraintEvaluator';
 import { createPieceMap } from './PieceFactory';
 import {
+  ANIMALS,
   emptyBoard,
   toBoard,
+  type Animal,
   type BentoPiece,
   type Board,
   type ClueCell,
@@ -12,7 +14,7 @@ import {
   type SolveResult,
 } from './types';
 
-type SolverPuzzle = Pick<PuzzleDefinition, 'activeAnimals' | 'pieces' | 'clues'>;
+type SolverPuzzle = Pick<PuzzleDefinition, 'pieces' | 'clues'>;
 
 const anchoredDescriptors = (puzzle: SolverPuzzle): ClueCell[][] => {
   const descriptors = Array.from({ length: 9 }, () => [] as ClueCell[]);
@@ -31,13 +33,14 @@ const pieceAllowedAt = (
   descriptors: readonly ClueCell[][],
 ): boolean => descriptors[position]!.every((descriptor) => pieceMatchesCell(piece, descriptor));
 
-export const solvePuzzle = (
+const solveForAnimals = (
   puzzle: SolverPuzzle,
-  limit = 2,
-  initialBoard: Board = emptyBoard(),
+  includedAnimals: readonly Animal[],
+  limit: number,
+  initialBoard: Board,
 ): SolveResult => {
-  const activeAnimalSet = new Set(puzzle.activeAnimals);
-  const availablePieces = puzzle.pieces.filter((piece) => activeAnimalSet.has(piece.animal));
+  const includedAnimalSet = new Set(includedAnimals);
+  const availablePieces = puzzle.pieces.filter((piece) => includedAnimalSet.has(piece.animal));
   const pieceMap = createPieceMap(puzzle.pieces);
   const descriptors = anchoredDescriptors(puzzle);
   const board = toBoard(initialBoard);
@@ -58,7 +61,7 @@ export const solvePuzzle = (
     const piece = pieceMap.get(pieceId);
     if (
       !piece ||
-      !activeAnimalSet.has(piece.animal) ||
+      !includedAnimalSet.has(piece.animal) ||
       !pieceAllowedAt(piece, position, descriptors)
     ) {
       return { count: 0, metrics };
@@ -113,6 +116,40 @@ export const solvePuzzle = (
   };
 
   if (allCluesPossible()) search(board.filter(Boolean).length);
+  return { count, firstSolution, metrics };
+};
+
+/**
+ * Solves exactly the rules visible to the player: choose nine pieces that form
+ * three complete animal families, leaving one whole family on the tray.
+ * No hidden animal-set input is accepted by this public solver.
+ */
+export const solvePuzzle = (
+  puzzle: SolverPuzzle,
+  limit = 2,
+  initialBoard: Board = emptyBoard(),
+): SolveResult => {
+  const metrics: SolveMetrics = {
+    exploredStates: 0,
+    maxDepth: 0,
+    forcedMoves: 0,
+    branchCount: 0,
+  };
+  let count = 0;
+  let firstSolution: Board | undefined;
+
+  for (const omittedAnimal of ANIMALS) {
+    if (count >= limit) break;
+    const includedAnimals = ANIMALS.filter((animal) => animal !== omittedAnimal);
+    const result = solveForAnimals(puzzle, includedAnimals, limit - count, initialBoard);
+    count += result.count;
+    firstSolution ??= result.firstSolution;
+    metrics.exploredStates += result.metrics.exploredStates;
+    metrics.maxDepth = Math.max(metrics.maxDepth, result.metrics.maxDepth);
+    metrics.forcedMoves += result.metrics.forcedMoves;
+    metrics.branchCount += result.metrics.branchCount;
+  }
+
   return { count, firstSolution, metrics };
 };
 

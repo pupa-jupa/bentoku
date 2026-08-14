@@ -28,7 +28,7 @@ export class CluePanel extends Phaser.GameObjects.Container {
     const flower = scene.add.image(-150, -316, 'tiny_flower').setDisplaySize(27, 27).setAngle(-8);
     const leaf = scene.add.image(151, -316, 'tiny_leaf').setDisplaySize(25, 25).setAngle(13);
     const subtitle = scene.add
-      .text(0, -286, 'Match the large map, then the four notes', {
+      .text(0, -286, 'Fixed map + sliding sketches', {
         fontFamily: 'Trebuchet MS, sans-serif',
         fontSize: '16px',
         color: '#72806d',

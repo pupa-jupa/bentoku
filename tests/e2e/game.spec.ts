@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 interface SceneState {
   selectedPiece: string | null;
   placement: { board: Array<string | null>; moves: number };
-  puzzle: { solution: string[] };
+  puzzle: { solution: string[]; difficulty: string };
   solved: boolean;
   modal?: unknown;
   pieces: Map<string, { x: number; y: number }>;
@@ -20,7 +20,7 @@ const screenPoint = async (page: Page, x: number, y: number) =>
   );
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/?seed=BENTO-E2E-0001');
+  await page.goto('/?seed=BENTO-E2E-0001&difficulty=gentle');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await expect(page.locator('canvas')).toBeVisible();
@@ -125,4 +125,42 @@ test('keeps the complete composition usable in landscape', async ({ page }) => {
   });
   expect(dimensions.width / dimensions.height).toBeCloseTo(16 / 9, 2);
   await expect(page.locator('#rotate-device')).toBeHidden();
+});
+
+test('lets the player switch deduction difficulty and preserves the choice', async ({ page }) => {
+  const difficultyButton = await screenPoint(page, 1034, 54);
+  await page.mouse.click(difficultyButton.x, difficultyButton.y);
+
+  const trickyButton = await screenPoint(page, 935, 602);
+  await page.mouse.click(trickyButton.x, trickyButton.y);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (
+          window as unknown as {
+            __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+          }
+        ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+        return {
+          difficulty: scene.puzzle.difficulty,
+          query: new URL(window.location.href).searchParams.get('difficulty'),
+          filled: scene.placement.board.filter(Boolean).length,
+        };
+      }),
+    )
+    .toEqual({ difficulty: 'Tricky', query: 'tricky', filled: 0 });
+
+  await page.reload();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (
+          window as unknown as {
+            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+          }
+        ).__BENTOKU_GAME__;
+        return game?.scene.getScene('PuzzleScene')?.puzzle?.difficulty ?? null;
+      }),
+    )
+    .toBe('Tricky');
 });

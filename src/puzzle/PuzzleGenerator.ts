@@ -1,4 +1,5 @@
-import { evaluateDifficulty } from './DifficultyEvaluator';
+import { DIFFICULTY_PROFILES } from './DifficultyEvaluator';
+import { logicalUncertainty, solveHumanly } from './HumanSolver';
 import { createAllPieces, createPieceMap } from './PieceFactory';
 import { normalizeSeed, SeededRandom } from './SeededRandom';
 import { solvePuzzle } from './PuzzleSolver';
@@ -9,6 +10,7 @@ import {
   type BentoPiece,
   type ClueCell,
   type CluePattern,
+  type Difficulty,
   type PieceId,
   type PuzzleDefinition,
 } from './types';
@@ -135,11 +137,22 @@ const GEOMETRIES: Geometry[] = [
   },
 ];
 
-const revealFor = (piece: BentoPiece, rng: SeededRandom, x: number, y: number): ClueCell => {
+const revealFor = (
+  piece: BentoPiece,
+  rng: SeededRandom,
+  difficulty: Difficulty,
+  x: number,
+  y: number,
+): ClueCell => {
+  const profile = DIFFICULTY_PROFILES[difficulty];
   const roll = rng.next();
-  if (roll < 0.14) return { x, y };
-  if (roll < 0.54) return { x, y, animal: piece.animal };
-  if (roll < 0.9) return { x, y, food: piece.food };
+  if (roll < profile.wildcardChance) return { x, y };
+  if (roll < profile.wildcardChance + profile.animalChance) {
+    return { x, y, animal: piece.animal };
+  }
+  if (roll < profile.wildcardChance + profile.animalChance + profile.foodChance) {
+    return { x, y, food: piece.food };
+  }
   return { x, y, animal: piece.animal, food: piece.food };
 };
 
@@ -148,13 +161,14 @@ const makeSpatialClue = (
   pieces: ReadonlyMap<PieceId, BentoPiece>,
   geometry: Geometry,
   rng: SeededRandom,
+  difficulty: Difficulty,
   id: string,
 ): CluePattern => {
   const originX = rng.int(4 - geometry.width);
   const originY = rng.int(4 - geometry.height);
   const cells = geometry.cells.map(([x, y]) => {
     const pieceId = solution[(originY + y) * 3 + originX + x]!;
-    return revealFor(pieces.get(pieceId)!, rng, x, y);
+    return revealFor(pieces.get(pieceId)!, rng, difficulty, x, y);
   });
   if (cells.filter((cell) => cell.animal || cell.food).length < 2) {
     const [first, second] = cells;
@@ -176,85 +190,165 @@ const makeAnchorClue = (
   solution: readonly PieceId[],
   pieces: ReadonlyMap<PieceId, BentoPiece>,
   rng: SeededRandom,
-): CluePattern => ({
-  id: 'anchor-map',
-  name: 'café map',
-  width: 3,
-  height: 3,
-  cells: solution.map((pieceId, index) => {
-    const piece = pieces.get(pieceId)!;
-    return index % 2 === rng.int(2)
-      ? { x: index % 3, y: Math.floor(index / 3), animal: piece.animal }
-      : { x: index % 3, y: Math.floor(index / 3), food: piece.food };
-  }),
-});
-
-export class PuzzleGenerator {
-  create(rawSeed: string): PuzzleDefinition {
-    const seed = normalizeSeed(rawSeed);
-    const rng = new SeededRandom(seed);
-    const pieces = createAllPieces();
-    const pieceMap = createPieceMap(pieces);
-    const activeAnimals = rng.shuffle(ANIMALS).slice(0, 3) as [Animal, Animal, Animal];
-    const activeSet = new Set(activeAnimals);
-    const solution = toBoard(
-      rng.shuffle(pieces.filter((piece) => activeSet.has(piece.animal))).map((piece) => piece.id),
-    );
-
-    const clues: CluePattern[] = [makeAnchorClue(solution as PieceId[], pieceMap, rng)];
-    let solveResult = solvePuzzle({ activeAnimals, pieces, clues });
-    const geometries = rng.shuffle(GEOMETRIES);
-
-    // Four large notes fit the paper as a stable 2 × 2 set. If they are not
-    // sufficient, the fixed map below is progressively made more specific.
-    for (let index = 0; solveResult.count !== 1 && index < 4; index += 1) {
-      const geometry = geometries[index % geometries.length]!;
-      clues.push(
-        makeSpatialClue(solution as PieceId[], pieceMap, geometry, rng, `clue-${index + 1}`),
-      );
-      solveResult = solvePuzzle({ activeAnimals, pieces, clues });
-    }
-
-    let fallbackIndex = 0;
-    const fallbackOrder = rng.shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]);
-    const anchor = clues[0]!;
-    while (solveResult.count !== 1 && fallbackIndex < 9) {
-      const position = fallbackOrder[fallbackIndex]!;
-      const piece = pieceMap.get(solution[position] as PieceId)!;
-      anchor.cells[position] = {
-        x: position % 3,
-        y: Math.floor(position / 3),
-        animal: piece.animal,
-        food: piece.food,
-      };
-      fallbackIndex += 1;
-      solveResult = solvePuzzle({ activeAnimals, pieces, clues });
-    }
-
-    if (solveResult.count !== 1) {
-      anchor.cells = solution.map((pieceId, position) => {
-        const piece = pieceMap.get(pieceId as PieceId)!;
+  difficulty: Difficulty,
+): CluePattern => {
+  const exactPositions = new Set(
+    rng
+      .shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8])
+      .slice(0, DIFFICULTY_PROFILES[difficulty].anchorExactCells),
+  );
+  return {
+    id: 'anchor-map',
+    name: 'café map',
+    width: 3,
+    height: 3,
+    cells: solution.map((pieceId, index) => {
+      const piece = pieces.get(pieceId)!;
+      if (exactPositions.has(index)) {
         return {
-          x: position % 3,
-          y: Math.floor(position / 3),
+          x: index % 3,
+          y: Math.floor(index / 3),
           animal: piece.animal,
           food: piece.food,
         };
+      }
+      return rng.next() < 0.5
+        ? { x: index % 3, y: Math.floor(index / 3), animal: piece.animal }
+        : { x: index % 3, y: Math.floor(index / 3), food: piece.food };
+    }),
+  };
+};
+
+const cloneClue = (clue: CluePattern, id = clue.id): CluePattern => ({
+  ...clue,
+  id,
+  cells: clue.cells.map((cell) => ({ ...cell })),
+});
+
+const exactAnchorAt = (
+  anchor: CluePattern,
+  position: number,
+  solution: readonly PieceId[],
+  pieces: ReadonlyMap<PieceId, BentoPiece>,
+): CluePattern => {
+  const next = cloneClue(anchor);
+  const piece = pieces.get(solution[position]!)!;
+  next.cells[position] = {
+    x: position % 3,
+    y: Math.floor(position / 3),
+    animal: piece.animal,
+    food: piece.food,
+  };
+  return next;
+};
+
+export class PuzzleGenerator {
+  create(rawSeed: string, difficulty: Difficulty = 'Gentle'): PuzzleDefinition {
+    const seed = normalizeSeed(rawSeed);
+    const solutionRng = new SeededRandom(seed);
+    const clueRng = new SeededRandom(`${seed}:${difficulty}`);
+    const pieces = createAllPieces();
+    const pieceMap = createPieceMap(pieces);
+    const includedAnimals = solutionRng.shuffle(ANIMALS).slice(0, 3) as [Animal, Animal, Animal];
+    const includedSet = new Set(includedAnimals);
+    const solution = toBoard(
+      solutionRng
+        .shuffle(pieces.filter((piece) => includedSet.has(piece.animal)))
+        .map((piece) => piece.id),
+    );
+    const solutionIds = solution as PieceId[];
+
+    let anchor = makeAnchorClue(solutionIds, pieceMap, clueRng, difficulty);
+    const selectedClues: CluePattern[] = [];
+    const geometries = clueRng.shuffle([...GEOMETRIES, ...clueRng.shuffle(GEOMETRIES).slice(0, 5)]);
+    const candidates = geometries.map((geometry, index) =>
+      makeSpatialClue(
+        solutionIds,
+        pieceMap,
+        geometry,
+        clueRng,
+        difficulty,
+        `candidate-${index + 1}`,
+      ),
+    );
+    let humanResult = solveHumanly({ pieces, clues: [anchor] });
+    const profile = DIFFICULTY_PROFILES[difficulty];
+
+    while (!humanResult.solved && selectedClues.length < profile.maxSpatialClues) {
+      const currentUncertainty = logicalUncertainty(humanResult);
+      let bestIndex = 0;
+      let bestResult = solveHumanly({ pieces, clues: [anchor, ...selectedClues, candidates[0]!] });
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      candidates.forEach((candidate, index) => {
+        const result = solveHumanly({ pieces, clues: [anchor, ...selectedClues, candidate] });
+        const progress = currentUncertainty - logicalUncertainty(result);
+        const score =
+          (result.solved ? 1_000_000 : 0) +
+          progress * 1_000 +
+          result.metrics.forcedPlacements * 10 +
+          result.metrics.clueOffsetEliminations;
+        if (score > bestScore) {
+          bestScore = score;
+          bestIndex = index;
+          bestResult = result;
+        }
       });
-      solveResult = solvePuzzle({ activeAnimals, pieces, clues });
+
+      const [chosen] = candidates.splice(bestIndex, 1);
+      if (!chosen) break;
+      selectedClues.push(cloneClue(chosen, `clue-${selectedClues.length + 1}`));
+      humanResult = bestResult;
     }
 
-    if (solveResult.count !== 1) throw new Error(`Unable to create a unique puzzle for ${seed}.`);
+    while (!humanResult.solved) {
+      const unresolvedPositions = anchor.cells
+        .map((cell, position) => ({ cell, position }))
+        .filter(({ cell }) => !cell.animal || !cell.food);
+      if (unresolvedPositions.length === 0) break;
+
+      let bestAnchor = exactAnchorAt(
+        anchor,
+        unresolvedPositions[0]!.position,
+        solutionIds,
+        pieceMap,
+      );
+      let bestResult = solveHumanly({ pieces, clues: [bestAnchor, ...selectedClues] });
+      let bestScore = Number.NEGATIVE_INFINITY;
+      for (const { position } of unresolvedPositions) {
+        const candidateAnchor = exactAnchorAt(anchor, position, solutionIds, pieceMap);
+        const result = solveHumanly({ pieces, clues: [candidateAnchor, ...selectedClues] });
+        const score =
+          (result.solved ? 1_000_000 : 0) -
+          logicalUncertainty(result) * 1_000 +
+          result.metrics.forcedPlacements * 10;
+        if (score > bestScore) {
+          bestScore = score;
+          bestAnchor = candidateAnchor;
+          bestResult = result;
+        }
+      }
+      anchor = bestAnchor;
+      humanResult = bestResult;
+    }
+
+    const clues = [anchor, ...selectedClues];
+    const exactResult = solvePuzzle({ pieces, clues }, 2);
+    if (!humanResult.solved || exactResult.count !== 1) {
+      throw new Error(`Unable to create a deductive, unique ${difficulty} puzzle for ${seed}.`);
+    }
+    if (exactResult.firstSolution?.some((pieceId, index) => pieceId !== solution[index])) {
+      throw new Error(`Generated clues do not resolve to the intended solution for ${seed}.`);
+    }
 
     return {
       version: 1,
       seed,
-      activeAnimals,
       pieces,
       clues,
-      difficulty: evaluateDifficulty(solveResult.metrics),
+      difficulty,
       solution,
-      metrics: solveResult.metrics,
+      metrics: humanResult.metrics,
     };
   }
 }

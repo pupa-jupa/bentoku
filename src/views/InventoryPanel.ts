@@ -24,9 +24,9 @@ export class InventoryPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     const sub = scene.add
-      .text(0, -324, 'Choose nine for the box', {
+      .text(0, -324, '3 complete families · 1 stays', {
         fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '15px',
+        fontSize: '14px',
         color: '#8d6d64',
       })
       .setOrigin(0.5);

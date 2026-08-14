@@ -1,10 +1,11 @@
 export const ANIMALS = ['cat', 'bear', 'pig', 'bunny'] as const;
 export const FOODS = ['egg', 'rice', 'sandwich'] as const;
+export const DIFFICULTIES = ['Cozy', 'Gentle', 'Clever', 'Tricky'] as const;
 
 export type Animal = (typeof ANIMALS)[number];
 export type Food = (typeof FOODS)[number];
 export type PieceId = `${Animal}_${Food}`;
-export type Difficulty = 'Cozy' | 'Gentle' | 'Clever' | 'Tricky';
+export type Difficulty = (typeof DIFFICULTIES)[number];
 
 export interface BentoPiece {
   id: PieceId;
@@ -54,27 +55,50 @@ export interface SolveResult {
   metrics: SolveMetrics;
 }
 
+export interface DeductionMetrics {
+  rounds: number;
+  candidateEliminations: number;
+  familyEliminations: number;
+  clueOffsetEliminations: number;
+  forcedPlacements: number;
+  initialForcedPlacements: number;
+  anchorExactCells: number;
+  spatialClues: number;
+  score: number;
+}
+
+export interface HumanSolveResult {
+  solved: boolean;
+  stalled: boolean;
+  board?: Board;
+  omittedAnimal?: Animal;
+  cellCandidates: PieceId[][];
+  omittedAnimalCandidates: Animal[];
+  metrics: DeductionMetrics;
+}
+
 export interface PuzzleDefinition {
   version: 1;
   seed: string;
-  activeAnimals: [Animal, Animal, Animal];
   pieces: BentoPiece[];
   clues: CluePattern[];
   difficulty: Difficulty;
   solution: Board;
-  metrics: SolveMetrics;
+  metrics: DeductionMetrics;
 }
 
 export interface PlayerSettings {
   sound: boolean;
   reducedMotion: boolean;
   hintMode: boolean;
+  difficulty: Difficulty;
 }
 
 export interface SaveData {
   version: 1;
   currentPuzzle?: {
     seed: string;
+    difficulty: Difficulty;
     board: Board;
     moves: number;
   };

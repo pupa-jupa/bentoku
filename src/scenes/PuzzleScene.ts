@@ -3,9 +3,20 @@ import { ANIMAL_LABELS, COLORS, FONT_BODY, FONT_DISPLAY, FOOD_LABELS } from '../
 import { HintController } from '../gameplay/HintController';
 import { PlacementController } from '../gameplay/PlacementController';
 import { PuzzleController } from '../gameplay/PuzzleController';
+import {
+  DIFFICULTY_PROFILES,
+  difficultySlug,
+  parseDifficulty,
+} from '../puzzle/DifficultyEvaluator';
 import { PuzzleGenerator } from '../puzzle/PuzzleGenerator';
 import { createDailySeed, createRandomSeed } from '../puzzle/SeededRandom';
-import type { PieceId, PlayerSettings, PuzzleDefinition } from '../puzzle/types';
+import {
+  DIFFICULTIES,
+  type Difficulty,
+  type PieceId,
+  type PlayerSettings,
+  type PuzzleDefinition,
+} from '../puzzle/types';
 import { AudioService } from '../services/AudioService';
 import { SaveService } from '../services/SaveService';
 import { BentoBoard } from '../views/BentoBoard';
@@ -62,8 +73,14 @@ export class PuzzleScene extends Phaser.Scene {
     this.settings = this.save.settings;
     this.audio = new AudioService(this.settings);
     const params = new URLSearchParams(window.location.search);
-    const seed = params.get('seed') ?? this.save.currentSeed ?? createRandomSeed();
-    this.createPuzzle(seed);
+    const difficulty =
+      parseDifficulty(params.get('difficulty')) ??
+      this.save.currentDifficulty ??
+      this.settings.difficulty;
+    const savedSeed =
+      this.save.currentDifficulty === difficulty ? this.save.currentSeed : undefined;
+    const seed = params.get('seed') ?? savedSeed ?? createRandomSeed();
+    this.createPuzzle(seed, difficulty);
     this.bindInput();
     this.time.addEvent({
       delay: 5200,
@@ -76,15 +93,17 @@ export class PuzzleScene extends Phaser.Scene {
     this.announce('Bentoku ready. Choose a bento friend, then choose a box cell.');
   }
 
-  private createPuzzle(seed: string): void {
-    this.puzzle = this.generator.create(seed);
+  private createPuzzle(seed: string, difficulty: Difficulty = this.settings.difficulty): void {
+    this.settings = this.save.updateSettings({ difficulty });
+    this.puzzle = this.generator.create(seed, difficulty);
     this.puzzleController = new PuzzleController(this.puzzle);
-    const saved = this.save.loadPuzzle(this.puzzle.seed);
+    const saved = this.save.loadPuzzle(this.puzzle.seed, this.puzzle.difficulty);
     this.placement = new PlacementController(saved.board, saved.moves);
     this.selectedPiece = null;
     this.solved = false;
     this.renderScene();
     this.saveCurrent();
+    this.syncUrl();
   }
 
   private renderScene(): void {
@@ -131,7 +150,7 @@ export class PuzzleScene extends Phaser.Scene {
     });
 
     this.seedText = this.add
-      .text(800, 54, `${this.puzzle.seed}  ·  ${this.puzzle.difficulty}`, {
+      .text(790, 54, this.puzzle.seed, {
         fontFamily: FONT_BODY,
         fontSize: '17px',
         fontStyle: 'bold',
@@ -144,6 +163,14 @@ export class PuzzleScene extends Phaser.Scene {
     this.seedText.on('pointerdown', () => void this.copySeed());
     this.seedText.on('pointerover', () => this.seedText.setColor('#c66f69'));
     this.seedText.on('pointerout', () => this.seedText.setColor('#74594f'));
+
+    this.makeButton({
+      x: 1034,
+      y: 54,
+      width: 126,
+      label: `${this.puzzle.difficulty} ▾`,
+      callback: () => this.openDifficultySelect(),
+    });
 
     this.makeButton({
       x: 1170,
@@ -291,6 +318,7 @@ export class PuzzleScene extends Phaser.Scene {
     keyboard?.on('keydown-H', () => this.openHelp());
     keyboard?.on('keydown-U', () => this.undo());
     keyboard?.on('keydown-S', () => this.openSettings());
+    keyboard?.on('keydown-D', () => this.openDifficultySelect());
     keyboard?.on('keydown-ESC', () => this.closeModal());
     keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
       event.preventDefault();
@@ -487,7 +515,7 @@ export class PuzzleScene extends Phaser.Scene {
     if (this.solved) return;
     this.openModal(
       'A note from the café',
-      'Each sketch keeps its shape, but can slide around the bento.\nAn animal mark means any food of that animal. A food mark means any animal.',
+      'Choose exactly three complete animal families; one whole family stays on the tray.\nEach sketch keeps its shape, but can slide around the bento. An animal mark means any food of that animal; a food mark means any animal.',
       [
         {
           label: 'Explain',
@@ -548,10 +576,36 @@ export class PuzzleScene extends Phaser.Scene {
     ]);
   }
 
+  private openDifficultySelect(): void {
+    if (this.solved) return;
+    this.openModal(
+      'Choose a deduction level',
+      'Every level has one visible solution and a complete logic path—never a required guess. Higher levels use longer chains and subtler notes.',
+      DIFFICULTIES.map((difficulty) => ({
+        label: difficulty === this.puzzle.difficulty ? `${difficulty} · current` : difficulty,
+        callback: () => this.switchDifficulty(difficulty),
+        primary: difficulty === this.puzzle.difficulty,
+      })),
+    );
+    this.audio.play('paper');
+  }
+
+  private switchDifficulty(difficulty: Difficulty): void {
+    if (difficulty === this.puzzle.difficulty) {
+      this.closeModal();
+      return;
+    }
+    this.closeModal();
+    this.createPuzzle(this.puzzle.seed, difficulty);
+    this.announce(
+      `${difficulty} difficulty selected. ${DIFFICULTY_PROFILES[difficulty].description}`,
+    );
+  }
+
   private openModal(
     titleText: string,
     bodyText: string,
-    actions: Array<{ label: string; callback: () => void }>,
+    actions: Array<{ label: string; callback: () => void; primary?: boolean }>,
   ): void {
     this.closeModal();
     const modal = this.add.container(800, 450).setDepth(2600);
@@ -594,7 +648,7 @@ export class PuzzleScene extends Phaser.Scene {
           width: 238,
           label: action.label,
           callback: action.callback,
-          primary: index === actions.length - 1 && actions.length > 1,
+          primary: action.primary ?? (index === actions.length - 1 && actions.length > 1),
         },
         modal,
       );
@@ -652,25 +706,24 @@ export class PuzzleScene extends Phaser.Scene {
 
   private startRandom(): void {
     this.closeModal();
-    this.createPuzzle(createRandomSeed());
+    this.createPuzzle(createRandomSeed(), this.puzzle.difficulty);
     this.announce('A fresh random bento is ready.');
   }
 
   private startDaily(): void {
     if (this.solved) return;
-    this.createPuzzle(createDailySeed());
+    this.createPuzzle(createDailySeed(), this.puzzle.difficulty);
     this.announce('Today’s daily bento is ready.');
   }
 
   private async copySeed(): Promise<void> {
     const url = new URL(window.location.href);
     url.searchParams.set('seed', this.puzzle.seed);
+    url.searchParams.set('difficulty', difficultySlug(this.puzzle.difficulty));
     try {
       await navigator.clipboard.writeText(url.toString());
       this.seedText?.setText('Link copied — warm and ready!');
-      this.time.delayedCall(1500, () =>
-        this.seedText?.setText(`${this.puzzle.seed}  ·  ${this.puzzle.difficulty}`),
-      );
+      this.time.delayedCall(1500, () => this.seedText?.setText(this.puzzle.seed));
       this.announce('Share link copied.');
     } catch {
       this.announce(`Share seed: ${this.puzzle.seed}`);
@@ -678,7 +731,19 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private saveCurrent(): void {
-    this.save.savePuzzle(this.puzzle.seed, this.placement.board, this.placement.moves);
+    this.save.savePuzzle(
+      this.puzzle.seed,
+      this.puzzle.difficulty,
+      this.placement.board,
+      this.placement.moves,
+    );
+  }
+
+  private syncUrl(): void {
+    const url = new URL(window.location.href);
+    url.searchParams.set('seed', this.puzzle.seed);
+    url.searchParams.set('difficulty', difficultySlug(this.puzzle.difficulty));
+    window.history.replaceState({}, '', url);
   }
 
   private announce(message: string): void {

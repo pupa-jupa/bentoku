@@ -18,7 +18,7 @@ import {
   type PuzzleDefinition,
 } from '../puzzle/types';
 import { AudioService } from '../services/AudioService';
-import { musicAssets } from '../services/AssetRegistry';
+import { musicAssets, type SoundName } from '../services/AssetRegistry';
 import { MusicService } from '../services/MusicService';
 import { SaveService } from '../services/SaveService';
 import { BentoBoard } from '../views/BentoBoard';
@@ -35,6 +35,7 @@ interface ButtonSpec {
   callback: () => void;
   primary?: boolean;
   icon?: boolean;
+  sound?: SoundName | false;
 }
 
 interface PiecePress {
@@ -81,7 +82,7 @@ export class PuzzleScene extends Phaser.Scene {
   create(): void {
     this.save = new SaveService();
     this.settings = this.save.settings;
-    this.audio = new AudioService(this.settings);
+    this.audio = new AudioService(this, this.settings);
     this.music = new MusicService(this, musicAssets, this.settings.musicVolume);
     const params = new URLSearchParams(window.location.search);
     const difficulty =
@@ -136,8 +137,10 @@ export class PuzzleScene extends Phaser.Scene {
       .text(56, 74, 'a tiny logic lunch', {
         fontFamily: FONT_BODY,
         fontSize: '15px',
-        color: '#9b756a',
+        color: '#765149',
         letterSpacing: 2,
+        stroke: '#f3d5bf',
+        strokeThickness: 1,
       })
       .setOrigin(0, 0.5);
 
@@ -182,6 +185,7 @@ export class PuzzleScene extends Phaser.Scene {
       width: 126,
       label: `${this.puzzle.difficulty} ▾`,
       callback: () => this.openDifficultySelect(),
+      sound: false,
     });
 
     this.makeButton({
@@ -198,6 +202,7 @@ export class PuzzleScene extends Phaser.Scene {
       label: '↶',
       callback: () => this.undo(),
       icon: true,
+      sound: false,
     });
     this.makeButton({
       x: 1362,
@@ -206,6 +211,7 @@ export class PuzzleScene extends Phaser.Scene {
       label: '?',
       callback: () => this.openHelp(),
       icon: true,
+      sound: false,
     });
     this.makeButton({
       x: 1426,
@@ -214,6 +220,7 @@ export class PuzzleScene extends Phaser.Scene {
       label: '⚙',
       callback: () => this.openSettings(),
       icon: true,
+      sound: false,
     });
 
     this.moveText = this.add
@@ -279,9 +286,8 @@ export class PuzzleScene extends Phaser.Scene {
     this.input.on('dragstart', (_pointer: Phaser.Input.Pointer, target: PieceView) => {
       if (this.solved || this.modal) return;
       this.dragging = target;
-      this.selectPiece(target.piece.id, false);
+      this.selectPiece(target.piece.id, false, false);
       target.lift();
-      this.audio.play('pick');
     });
     this.input.on(
       'drag',
@@ -318,7 +324,7 @@ export class PuzzleScene extends Phaser.Scene {
       if (slot !== null) this.placeSelected(slot);
       else if (this.inventory.containsWorldPoint(target.x, target.y) && target.boardCell !== null) {
         this.placement.returnToTray(target.piece.id);
-        this.audio.play('paper');
+        this.audio.play('piece_return');
         this.afterBoardChange();
       } else target.returnHome(this.settings.reducedMotion);
       target.setDepth(100);
@@ -349,7 +355,7 @@ export class PuzzleScene extends Phaser.Scene {
     });
   }
 
-  private selectPiece(pieceId: PieceId, toggle = true): void {
+  private selectPiece(pieceId: PieceId, toggle = true, withSound = true): void {
     this.selectedPiece = toggle && this.selectedPiece === pieceId ? null : pieceId;
     this.pieces.forEach((view, id) => {
       view.setSelected(id === this.selectedPiece);
@@ -357,7 +363,7 @@ export class PuzzleScene extends Phaser.Scene {
     });
     if (this.selectedPiece) {
       const piece = this.pieces.get(this.selectedPiece)!.piece;
-      this.audio.play('pick');
+      if (withSound) this.audio.play('piece_pick');
       this.announce(`${ANIMAL_LABELS[piece.animal]} ${FOOD_LABELS[piece.food]} selected.`);
     }
   }
@@ -376,7 +382,7 @@ export class PuzzleScene extends Phaser.Scene {
     if (!this.selectedPiece) return;
     const result = this.placement.place(this.selectedPiece, index);
     if (result.changed) {
-      this.audio.play(result.swapped ? 'swap' : 'drop');
+      this.audio.play(result.swapped ? 'piece_swap' : 'piece_drop');
       this.afterBoardChange();
     }
     this.selectedPiece = null;
@@ -390,7 +396,7 @@ export class PuzzleScene extends Phaser.Scene {
     if (!this.placement.isFull()) return;
     if (this.puzzleController.validate(this.placement.board)) this.celebrate();
     else {
-      this.audio.play('wrong');
+      this.audio.play('board_incorrect', 120);
       this.bento.wobble(this.settings.reducedMotion);
       this.announce('Almost! A few friends are still reading the note differently. Keep trying.');
     }
@@ -431,10 +437,11 @@ export class PuzzleScene extends Phaser.Scene {
   private undo(): void {
     if (this.modal || this.solved) return;
     if (!this.placement.restorePrevious()) {
+      this.audio.play('ui_tap');
       this.announce('Nothing to undo yet.');
       return;
     }
-    this.audio.play('paper');
+    this.audio.play('piece_return');
     this.updatePiecePositions(true);
     this.updateStatus();
     this.saveCurrent();
@@ -444,7 +451,7 @@ export class PuzzleScene extends Phaser.Scene {
   private celebrate(): void {
     this.solved = true;
     this.save.markSolved();
-    this.audio.play('success');
+    this.audio.play('success', 100);
     this.announce('Bento complete!');
     if (!this.settings.reducedMotion) {
       this.placement.board.forEach((pieceId, index) => {
@@ -466,7 +473,10 @@ export class PuzzleScene extends Phaser.Scene {
     this.time.delayedCall(this.settings.reducedMotion ? 150 : 850, () => {
       this.modal = new CelebrationView(
         this,
-        () => this.startRandom(),
+        () => {
+          this.audio.play('ui_tap');
+          this.startRandom();
+        },
         () => void this.copySeed(),
       );
     });
@@ -564,7 +574,10 @@ export class PuzzleScene extends Phaser.Scene {
       .setOrigin(0.5);
     container.add([background, text]);
     container.setSize(spec.width, height).setInteractive({ useHandCursor: true });
-    container.on('pointerdown', spec.callback);
+    container.on('pointerdown', () => {
+      if (spec.sound !== false) this.audio.play(spec.sound ?? 'ui_tap');
+      spec.callback();
+    });
     container.on('pointerover', () => container.setScale(1.05));
     container.on('pointerout', () => container.setScale(1));
     parent?.add(container);
@@ -580,10 +593,12 @@ export class PuzzleScene extends Phaser.Scene {
         {
           label: 'Explain',
           callback: () => this.showMessage('How notes work', this.hint.explain(this.puzzle)),
+          sound: 'note_open',
         },
         {
           label: 'Nudge',
           callback: () => this.showMessage('A gentle nudge', this.hint.nudge(this.puzzle)),
+          sound: 'note_open',
         },
         {
           label: 'Reveal one',
@@ -591,18 +606,19 @@ export class PuzzleScene extends Phaser.Scene {
             const index = this.hint.reveal(this.puzzle, this.placement.board);
             this.closeModal();
             if (index !== null) {
-              this.bento.slots[index]!.setHighlighted(true, true);
-              this.time.delayedCall(2800, () => this.bento.slots[index]?.setHighlighted(false));
+              this.audio.play('hint_reveal');
+              this.showHintReveal(index);
               this.announce(`A helpful glow marks cell ${index + 1}.`);
             }
           },
+          sound: false,
         },
       ],
     );
-    this.audio.play('paper');
+    this.audio.play('note_open');
   }
 
-  private openSettings(): void {
+  private openSettings(withSound = true): void {
     if (this.solved) return;
     this.openModal(
       'Cozy settings',
@@ -614,7 +630,7 @@ export class PuzzleScene extends Phaser.Scene {
             this.settings = this.save.updateSettings({ sound: !this.settings.sound });
             this.audio.setEnabled(this.settings.sound);
             this.closeModal();
-            this.openSettings();
+            this.openSettings(false);
           },
         },
         {
@@ -624,7 +640,7 @@ export class PuzzleScene extends Phaser.Scene {
               reducedMotion: !this.settings.reducedMotion,
             });
             this.closeModal();
-            this.openSettings();
+            this.openSettings(false);
           },
         },
         {
@@ -636,6 +652,7 @@ export class PuzzleScene extends Phaser.Scene {
             this.updateStatus();
             this.saveCurrent();
           },
+          sound: 'piece_return',
         },
         { label: 'New random', callback: () => this.startRandom() },
       ],
@@ -648,6 +665,7 @@ export class PuzzleScene extends Phaser.Scene {
         },
       },
     );
+    if (withSound) this.audio.play('note_open');
   }
 
   private openDifficultySelect(): void {
@@ -661,7 +679,7 @@ export class PuzzleScene extends Phaser.Scene {
         primary: difficulty === this.puzzle.difficulty,
       })),
     );
-    this.audio.play('paper');
+    this.audio.play('note_open');
   }
 
   private switchDifficulty(difficulty: Difficulty): void {
@@ -679,7 +697,12 @@ export class PuzzleScene extends Phaser.Scene {
   private openModal(
     titleText: string,
     bodyText: string,
-    actions: Array<{ label: string; callback: () => void; primary?: boolean }>,
+    actions: Array<{
+      label: string;
+      callback: () => void;
+      primary?: boolean;
+      sound?: SoundName | false;
+    }>,
     slider?: SliderSpec,
   ): void {
     this.closeModal();
@@ -713,18 +736,21 @@ export class PuzzleScene extends Phaser.Scene {
       .setOrigin(0.5);
     modal.add([shade, card, title, body]);
     if (slider) this.makeSlider(modal, -height / 2 + 218, slider);
+    const columns = actions.length === 1 ? 1 : 2;
+    const rowCount = Math.ceil(actions.length / columns);
     actions.forEach((action, index) => {
-      const columns = actions.length === 1 ? 1 : 2;
       const column = index % columns;
       const row = Math.floor(index / columns);
+      const lastRowY = height / 2 - (rowCount === 1 ? 88 : 50);
       this.makeButton(
         {
           x: columns === 1 ? 0 : -135 + column * 270,
-          y: height / 2 - 88 + row * 58,
+          y: lastRowY - (rowCount - 1 - row) * 58,
           width: 238,
           label: action.label,
           callback: action.callback,
           primary: action.primary ?? (index === actions.length - 1 && actions.length > 1),
+          sound: action.sound,
         },
         modal,
       );
@@ -737,11 +763,51 @@ export class PuzzleScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
-    close.on('pointerdown', () => this.closeModal());
+    close.on('pointerdown', () => {
+      this.audio.play('ui_tap');
+      this.closeModal();
+    });
     modal.add(close);
     modal.setAlpha(0).setScale(0.96);
     this.tweens.add({ targets: modal, alpha: 1, scale: 1, duration: 180, ease: 'Sine.easeOut' });
     this.modal = modal;
+  }
+
+  private showHintReveal(index: number): void {
+    const slot = this.bento.slots[index];
+    if (!slot) return;
+    const position = this.bento.slotWorldPosition(index);
+    slot.setHighlighted(true, true);
+
+    const ring = this.add.graphics().setPosition(position.x, position.y).setDepth(2200);
+    ring.fillStyle(COLORS.honey, 0.16);
+    ring.fillRoundedRect(-76, -76, 152, 152, 28);
+    ring.lineStyle(7, COLORS.honey, 0.96);
+    ring.strokeRoundedRect(-76, -76, 152, 152, 28);
+    ring.setScale(0.92).setAlpha(0).setName('hint-reveal');
+    this.tweens.add({
+      targets: ring,
+      scale: 1,
+      alpha: 1,
+      duration: 180,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        if (!ring.active) return;
+        this.tweens.add({
+          targets: ring,
+          scale: 1.035,
+          alpha: 0.38,
+          duration: 360,
+          yoyo: true,
+          repeat: 4,
+          ease: 'Sine.easeInOut',
+        });
+      },
+    });
+    this.time.delayedCall(4000, () => {
+      if (slot.active) slot.setHighlighted(false);
+      if (ring.active) ring.destroy();
+    });
   }
 
   private makeSlider(parent: Phaser.GameObjects.Container, y: number, spec: SliderSpec): void {
@@ -838,6 +904,7 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private async copySeed(): Promise<void> {
+    this.audio.play('ui_tap');
     const url = new URL(window.location.href);
     url.searchParams.set('seed', this.puzzle.seed);
     url.searchParams.set('difficulty', difficultySlug(this.puzzle.difficulty));

@@ -19,8 +19,8 @@ export class InventoryPanel extends Phaser.GameObjects.Container {
         fontStyle: 'bold',
         color: '#704f47',
         letterSpacing: 2,
-        backgroundColor: '#fff9efe8',
-        padding: { x: 12, y: 5 },
+        stroke: '#f5e5d3',
+        strokeThickness: 1,
       })
       .setOrigin(0.5);
     const sub = scene.add
@@ -28,8 +28,8 @@ export class InventoryPanel extends Phaser.GameObjects.Container {
         fontFamily: 'Trebuchet MS, sans-serif',
         fontSize: '14px',
         color: '#74584f',
-        backgroundColor: '#fff9efd8',
-        padding: { x: 10, y: 3 },
+        stroke: '#f5e5d3',
+        strokeThickness: 1,
       })
       .setOrigin(0.5);
     this.add([title, sub]);

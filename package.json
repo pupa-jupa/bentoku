@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "assets:build": "node scripts/build-runtime-assets.mjs",
-    "assets:verify": "node scripts/verify-lossless-webp.mjs"
+    "assets:verify": "node scripts/verify-lossless-webp.mjs",
+    "sfx:build": "node scripts/generate-sfx.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

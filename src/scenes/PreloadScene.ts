@@ -1,6 +1,12 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_DISPLAY } from '../game/constants';
-import { clueAssets, environmentAssets, musicAssets, pieceAssets } from '../services/AssetRegistry';
+import {
+  clueAssets,
+  environmentAssets,
+  musicAssets,
+  pieceAssets,
+  soundAssets,
+} from '../services/AssetRegistry';
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -32,6 +38,7 @@ export class PreloadScene extends Phaser.Scene {
     [...pieceAssets, ...clueAssets, ...environmentAssets].forEach(({ key, path }) =>
       this.load.image(key, path),
     );
+    Object.values(soundAssets).forEach(({ key, path }) => this.load.audio(key, path));
     const firstMusic = musicAssets[0];
     if (firstMusic) this.load.audio(firstMusic.key, firstMusic.path);
   }

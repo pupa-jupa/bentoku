@@ -37,7 +37,7 @@ The 10,000-puzzle suite is part of `pnpm test` and covers all four difficulty le
 - A public-rule exact solver that considers all 12 visible pieces
 - A separate no-assumption deduction solver using constraint propagation, sliding-pattern support, complete-family elimination, and all-different matching
 - Information-gain clue selection and four measured deduction profiles
-- Local persistence, procedural Web Audio feedback, and a compressed gently faded BGM playlist
+- Local persistence, softly synthesized sound effects, and a compressed gently faded BGM playlist
 - No backend and no runtime network dependency for game logic or art
 
 The art direction, prompts, source generations, and manifest live under `art/`.

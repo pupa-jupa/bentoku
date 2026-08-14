@@ -1,51 +1,59 @@
+import Phaser from 'phaser';
 import type { PlayerSettings } from '../puzzle/types';
-
-export type SoundName = 'pick' | 'drop' | 'swap' | 'wrong' | 'success' | 'paper';
+import { soundAssets, type SoundName } from './AssetRegistry';
 
 export class AudioService {
-  private context?: AudioContext;
+  private readonly scene: Phaser.Scene;
   private enabled: boolean;
+  private disposed = false;
+  private readonly active = new Set<Phaser.Sound.BaseSound>();
+  private readonly pending = new Set<Phaser.Time.TimerEvent>();
 
-  constructor(settings: PlayerSettings) {
+  constructor(scene: Phaser.Scene, settings: PlayerSettings) {
+    this.scene = scene;
     this.enabled = settings.sound;
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.dispose());
   }
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
+    if (!enabled) [...this.active].forEach((sound) => this.release(sound));
   }
 
-  private getContext(): AudioContext | undefined {
-    if (!this.enabled) return undefined;
-    this.context ??= new AudioContext();
-    return this.context;
-  }
+  play(name: SoundName, delayMs = 0): void {
+    if (!this.enabled || this.disposed) return;
+    if (delayMs <= 0) {
+      this.playNow(name);
+      return;
+    }
 
-  play(name: SoundName): void {
-    const context = this.getContext();
-    if (!context) return;
-    const now = context.currentTime;
-    const gain = context.createGain();
-    gain.connect(context.destination);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(name === 'success' ? 0.12 : 0.055, now + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + (name === 'success' ? 0.65 : 0.18));
-
-    const notes: Record<SoundName, number[]> = {
-      pick: [420],
-      drop: [330],
-      swap: [360, 450],
-      wrong: [220, 196],
-      success: [523, 659, 784],
-      paper: [285],
-    };
-
-    notes[name].forEach((frequency, index) => {
-      const oscillator = context.createOscillator();
-      oscillator.type = name === 'wrong' ? 'sine' : 'triangle';
-      oscillator.frequency.setValueAtTime(frequency, now + index * 0.11);
-      oscillator.connect(gain);
-      oscillator.start(now + index * 0.11);
-      oscillator.stop(now + index * 0.11 + (name === 'success' ? 0.3 : 0.14));
+    const timer = this.scene.time.delayedCall(delayMs, () => {
+      this.pending.delete(timer);
+      if (this.enabled && !this.disposed) this.playNow(name);
     });
+    this.pending.add(timer);
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.pending.forEach((timer) => timer.remove(false));
+    this.pending.clear();
+    [...this.active].forEach((sound) => this.release(sound));
+  }
+
+  private playNow(name: SoundName): void {
+    const asset = soundAssets[name];
+    if (!this.scene.cache.audio.exists(asset.key)) return;
+    const sound = this.scene.sound.add(asset.key, { volume: 1, loop: false });
+    this.active.add(sound);
+    sound.once(Phaser.Sound.Events.COMPLETE, () => this.release(sound));
+    if (!sound.play()) this.release(sound);
+  }
+
+  private release(sound: Phaser.Sound.BaseSound): void {
+    if (!this.active.delete(sound)) return;
+    if (sound.isPlaying) sound.stop();
+    sound.destroy();
   }
 }

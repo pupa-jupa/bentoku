@@ -13,21 +13,23 @@ export class InventoryPanel extends Phaser.GameObjects.Container {
     this.add(this.background);
     this.draw();
     const title = scene.add
-      .text(0, -354, 'BENTO FRIENDS', {
+      .text(0, -363, 'BENTO FRIENDS', {
         fontFamily: FONT_DISPLAY,
         fontSize: '20px',
         fontStyle: 'bold',
         color: '#704f47',
         letterSpacing: 2,
-        backgroundColor: '#fff9efbb',
+        backgroundColor: '#fff9efe8',
         padding: { x: 12, y: 5 },
       })
       .setOrigin(0.5);
     const sub = scene.add
-      .text(0, -324, '3 complete families · 1 stays', {
+      .text(0, -334, '3 complete families · 1 stays', {
         fontFamily: 'Trebuchet MS, sans-serif',
         fontSize: '14px',
-        color: '#8d6d64',
+        color: '#74584f',
+        backgroundColor: '#fff9efd8',
+        padding: { x: 10, y: 3 },
       })
       .setOrigin(0.5);
     this.add([title, sub]);

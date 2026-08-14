@@ -11,13 +11,8 @@ export class CluePanel extends Phaser.GameObjects.Container {
     super(scene, x, y);
     scene.add.existing(this);
 
-    const shadow = scene.add.graphics();
-    shadow.fillStyle(COLORS.milk, 0.08);
-    shadow.fillRoundedRect(-this.width / 2, -this.height / 2, this.width, this.height, 20);
-    this.add(shadow);
-
     const title = scene.add
-      .text(0, -319, 'ORDER NOTES', {
+      .text(0, -300, 'ORDER NOTES', {
         fontFamily: FONT_DISPLAY,
         fontSize: '25px',
         fontStyle: 'bold',
@@ -25,16 +20,9 @@ export class CluePanel extends Phaser.GameObjects.Container {
         letterSpacing: 2,
       })
       .setOrigin(0.5);
-    const flower = scene.add.image(-150, -316, 'tiny_flower').setDisplaySize(27, 27).setAngle(-8);
-    const leaf = scene.add.image(151, -316, 'tiny_leaf').setDisplaySize(25, 25).setAngle(13);
-    const subtitle = scene.add
-      .text(0, -286, 'Fixed map + sliding sketches', {
-        fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '16px',
-        color: '#72806d',
-      })
-      .setOrigin(0.5);
-    this.add([flower, leaf, title, subtitle]);
+    const flower = scene.add.image(-150, -297, 'tiny_flower').setDisplaySize(27, 27).setAngle(-8);
+    const leaf = scene.add.image(151, -297, 'tiny_leaf').setDisplaySize(25, 25).setAngle(13);
+    this.add([flower, leaf, title]);
 
     const anchor = clues.find((clue) => clue.id === 'anchor-map');
     const spatial = clues.filter((clue) => clue.id !== 'anchor-map').slice(0, 4);
@@ -45,10 +33,10 @@ export class CluePanel extends Phaser.GameObjects.Container {
 
     const divider = scene.add.graphics();
     divider.lineStyle(2, COLORS.ink, 0.16);
-    divider.lineBetween(-156, -64, 156, -64);
+    divider.lineBetween(-156, -55, 156, -55);
     this.add(divider);
     const sectionTitle = scene.add
-      .text(0, -48, 'SLIDING SKETCHES', {
+      .text(0, -38, 'SLIDING SKETCHES', {
         fontFamily: FONT_DISPLAY,
         fontSize: '13px',
         fontStyle: 'bold',
@@ -57,7 +45,7 @@ export class CluePanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     this.add(sectionTitle);
-    const sparkle = scene.add.image(149, -47, 'tiny_sparkle').setDisplaySize(20, 20).setAlpha(0.7);
+    const sparkle = scene.add.image(149, -37, 'tiny_sparkle').setDisplaySize(20, 20).setAlpha(0.7);
     this.add(sparkle);
 
     spatial.forEach((clue, index) => {
@@ -65,7 +53,7 @@ export class CluePanel extends Phaser.GameObjects.Container {
       const itemsInRow = Math.min(2, spatial.length - row * 2);
       const column = index % 2;
       const xPosition = itemsInRow === 1 ? 0 : -84 + column * 168;
-      const view = new ClueView(scene, clue, xPosition, 41 + row * 174, 158);
+      const view = new ClueView(scene, clue, xPosition, 52 + row * 166, 158);
       this.add(view);
     });
 

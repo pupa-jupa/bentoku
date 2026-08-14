@@ -70,6 +70,7 @@ export class PuzzleScene extends Phaser.Scene {
   private modal?: Phaser.GameObjects.Container;
   private moveText!: Phaser.GameObjects.Text;
   private seedText!: Phaser.GameObjects.Text;
+  private petalTimer?: Phaser.Time.TimerEvent;
   private focusIndex = -1;
   private solved = false;
 
@@ -92,6 +93,7 @@ export class PuzzleScene extends Phaser.Scene {
     const seed = params.get('seed') ?? savedSeed ?? createRandomSeed();
     this.createPuzzle(seed, difficulty);
     this.bindInput();
+    this.schedulePetalDrift(true);
     this.time.addEvent({
       delay: 5200,
       loop: true,
@@ -491,6 +493,52 @@ export class PuzzleScene extends Phaser.Scene {
         duration: 520,
         delay: index * 60,
         onComplete: () => star.destroy(),
+      });
+    }
+  }
+
+  private schedulePetalDrift(initial = false): void {
+    this.petalTimer?.remove(false);
+    const delay = initial ? Phaser.Math.Between(9000, 15000) : Phaser.Math.Between(19000, 32000);
+    this.petalTimer = this.time.delayedCall(delay, () => {
+      this.petalTimer = undefined;
+      if (!this.settings.reducedMotion && !this.modal && !this.solved) this.driftSakuraPetals();
+      this.schedulePetalDrift();
+    });
+  }
+
+  private driftSakuraPetals(): void {
+    const fromRight = Math.random() < 0.7;
+    const petalCount = Phaser.Math.Between(2, 3);
+    const startX = fromRight ? 1620 : Phaser.Math.Between(520, 1510);
+    const startY = fromRight ? Phaser.Math.Between(90, 590) : -18;
+
+    for (let index = 0; index < petalCount; index += 1) {
+      const petal = this.add
+        .ellipse(
+          startX + (fromRight ? index * 18 : index * 34),
+          startY - (fromRight ? index * 32 : index * 10),
+          Phaser.Math.Between(8, 11),
+          Phaser.Math.Between(4, 6),
+          COLORS.blush,
+          Phaser.Math.FloatBetween(0.15, 0.24),
+        )
+        .setAngle(Phaser.Math.Between(-35, 35))
+        .setDepth(70)
+        .setName('sakura-petal');
+      const driftX = fromRight ? -Phaser.Math.Between(350, 520) : Phaser.Math.Between(-150, 120);
+      const driftY = fromRight ? Phaser.Math.Between(140, 250) : Phaser.Math.Between(300, 460);
+
+      this.tweens.add({
+        targets: petal,
+        x: petal.x + driftX,
+        y: petal.y + driftY,
+        angle: petal.angle + Phaser.Math.Between(160, 310),
+        alpha: 0,
+        duration: Phaser.Math.Between(7000, 9500),
+        delay: index * 420,
+        ease: 'Sine.easeInOut',
+        onComplete: () => petal.destroy(),
       });
     }
   }

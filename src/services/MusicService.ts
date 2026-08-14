@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import type { AssetEntry } from './AssetRegistry';
 
-export const MUSIC_CROSSFADE_SECONDS = 4;
-const MUSIC_FADE_IN_SECONDS = 1.6;
+export const MUSIC_FADE_OUT_SECONDS = 1.25;
+export const MUSIC_SILENCE_SECONDS = 0.25;
+const MUSIC_FADE_IN_SECONDS = 1.5;
 
 interface PlayingTrack {
   sound: Phaser.Sound.BaseSound;
@@ -17,9 +18,10 @@ export class MusicService {
   private nextTrackIndex = 0;
   private started = false;
   private disposed = false;
+  private transitioning = false;
   private current?: PlayingTrack;
-  private outgoing?: PlayingTrack;
   private transitionTimer?: Phaser.Time.TimerEvent;
+  private gapTimer?: Phaser.Time.TimerEvent;
   private transitionTween?: Phaser.Tweens.Tween;
   private loadingKey?: string;
   private pendingLoadedAction?: () => void;
@@ -34,14 +36,13 @@ export class MusicService {
   start(): void {
     if (this.disposed || this.started) return;
     this.started = true;
-    if (this.volume > 0) this.playNext(true);
+    if (this.volume > 0) this.playNext();
   }
 
   setVolume(volume: number): void {
     this.volume = Phaser.Math.Clamp(volume, 0, 1);
     this.applyVolume(this.current);
-    this.applyVolume(this.outgoing);
-    if (this.started && !this.current && this.volume > 0) this.playNext(true);
+    if (this.started && !this.current && !this.transitioning && this.volume > 0) this.playNext();
   }
 
   get currentTrackKey(): string | undefined {
@@ -56,18 +57,17 @@ export class MusicService {
     if (this.disposed) return;
     this.disposed = true;
     this.transitionTimer?.remove(false);
+    this.gapTimer?.remove(false);
     this.transitionTween?.stop();
-    const tracks = new Set([this.current, this.outgoing].filter(Boolean) as PlayingTrack[]);
-    tracks.forEach((track) => this.release(track));
+    if (this.current) this.release(this.current);
     this.current = undefined;
-    this.outgoing = undefined;
   }
 
-  private playNext(initial: boolean): void {
+  private playNext(): void {
     if (this.disposed || this.tracks.length === 0) return;
     const asset = this.tracks[this.nextTrackIndex % this.tracks.length]!;
     if (!this.scene.cache.audio.exists(asset.key)) {
-      this.loadTrack(asset, () => this.playNext(initial));
+      this.loadTrack(asset, () => this.playNext());
       return;
     }
 
@@ -76,22 +76,20 @@ export class MusicService {
 
     if (!sound.play()) {
       sound.destroy();
-      this.scene.time.delayedCall(500, () => this.playNext(initial));
+      this.scene.time.delayedCall(500, () => this.playNext());
       return;
     }
 
     this.nextTrackIndex = (this.nextTrackIndex + 1) % this.tracks.length;
-    const previous = this.current;
     this.current = incoming;
     sound.once(Phaser.Sound.Events.COMPLETE, () => this.handleComplete(incoming));
 
-    if (initial || !previous) this.fadeIn(incoming);
-    else this.crossfade(previous, incoming);
+    this.fadeIn(incoming);
 
-    const transitionDelay = Math.max(1, sound.duration - MUSIC_CROSSFADE_SECONDS - 0.15);
+    const transitionDelay = Math.max(1, sound.duration - MUSIC_FADE_OUT_SECONDS - 0.1);
     this.transitionTimer?.remove(false);
     this.transitionTimer = this.scene.time.delayedCall(transitionDelay * 1000, () => {
-      if (this.current === incoming) this.playNext(false);
+      if (this.current === incoming) this.fadeOutAndQueueNext(incoming);
     });
     this.bufferUpcomingTrack();
   }
@@ -153,43 +151,55 @@ export class MusicService {
       onComplete: () => {
         track.mix = 1;
         this.applyVolume(track);
+        this.transitionTween = undefined;
       },
     });
   }
 
-  private crossfade(previous: PlayingTrack, incoming: PlayingTrack): void {
-    this.outgoing = previous;
+  private fadeOutAndQueueNext(track: PlayingTrack): void {
+    if (this.disposed || this.current !== track || track.released || this.transitioning) return;
+    this.transitioning = true;
+    this.transitionTimer?.remove(false);
+    const startingMix = track.mix;
     this.transitionTween?.stop();
     this.transitionTween = this.scene.tweens.addCounter({
       from: 0,
       to: 1,
-      duration: MUSIC_CROSSFADE_SECONDS * 1000,
+      duration: MUSIC_FADE_OUT_SECONDS * 1000,
       ease: 'Linear',
       onUpdate: (tween) => {
         const progress = tween.getValue() ?? 0;
-        previous.mix = Math.cos((progress * Math.PI) / 2);
-        incoming.mix = Math.sin((progress * Math.PI) / 2);
-        this.applyVolume(previous);
-        this.applyVolume(incoming);
+        track.mix = startingMix * Math.cos((progress * Math.PI) / 2);
+        this.applyVolume(track);
       },
       onComplete: () => {
-        incoming.mix = 1;
-        this.applyVolume(incoming);
-        this.release(previous);
+        this.transitionTween = undefined;
+        this.release(track);
+        if (this.current === track) this.current = undefined;
+        this.queueNextAfterSilence();
       },
     });
   }
 
   private handleComplete(track: PlayingTrack): void {
-    if (this.outgoing === track) {
-      this.release(track);
-      return;
-    }
     if (this.current !== track || this.disposed) return;
     this.transitionTimer?.remove(false);
+    this.transitionTween?.stop();
+    this.transitionTween = undefined;
+    this.transitioning = true;
     this.release(track);
     this.current = undefined;
-    this.playNext(true);
+    this.queueNextAfterSilence();
+  }
+
+  private queueNextAfterSilence(): void {
+    if (this.disposed) return;
+    this.gapTimer?.remove(false);
+    this.gapTimer = this.scene.time.delayedCall(MUSIC_SILENCE_SECONDS * 1000, () => {
+      this.gapTimer = undefined;
+      this.transitioning = false;
+      this.playNext();
+    });
   }
 
   private release(track: PlayingTrack): void {
@@ -197,7 +207,6 @@ export class MusicService {
     track.released = true;
     if (track.sound.isPlaying) track.sound.stop();
     track.sound.destroy();
-    if (this.outgoing === track) this.outgoing = undefined;
   }
 
   private applyVolume(track: PlayingTrack | undefined): void {

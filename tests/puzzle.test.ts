@@ -68,6 +68,18 @@ describe('puzzle generator and public solver', () => {
     expect(human.metrics.rounds).toBeGreaterThan(0);
   });
 
+  it('keeps the reported daily tricky puzzle consistent and uniquely solvable', () => {
+    const puzzle = generator.create('BENTO-D260-814B', 'Tricky');
+    const exact = solvePuzzle(puzzle, 2);
+    const human = solveHumanly(puzzle);
+
+    expect(boardSatisfiesPuzzle(puzzle.solution, puzzle.clues, createPieceMap(puzzle.pieces))).toBe(
+      true,
+    );
+    expect(exact).toMatchObject({ count: 1, firstSolution: puzzle.solution });
+    expect(human).toMatchObject({ solved: true, stalled: false, board: puzzle.solution });
+  });
+
   it('orders the four levels by measured deduction complexity', () => {
     const scores = new Map<Difficulty, number>();
     for (const difficulty of DIFFICULTIES) {

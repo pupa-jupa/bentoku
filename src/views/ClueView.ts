@@ -17,7 +17,7 @@ export class ClueView extends Phaser.GameObjects.Container {
     this.clue = clue;
     scene.add.existing(this);
     const isAnchor = clue.width === 3 && clue.height === 3;
-    const cellSize = isAnchor ? 48 : Math.min(compact ? 40 : 44, (maxWidth - 24) / clue.width);
+    const cellSize = isAnchor ? 48 : Math.min(44, (maxWidth - 24) / clue.width);
     const gridWidth = cellSize * clue.width;
     const gridHeight = cellSize * clue.height;
     const padTop = compact ? 12 : 16;
@@ -80,8 +80,8 @@ export class ClueView extends Phaser.GameObjects.Container {
           centerY + cellSize * 0.17,
           `glyph_${cell.food}`,
         );
-        fitInside(animal, cellSize * 0.54);
-        fitInside(food, cellSize * 0.5);
+        fitInside(animal, cellSize * 0.57);
+        fitInside(food, cellSize * 0.53);
         const slash = scene.add.graphics();
         slash.lineStyle(1.5, COLORS.ink, 0.52);
         slash.lineBetween(
@@ -94,7 +94,7 @@ export class ClueView extends Phaser.GameObjects.Container {
       } else {
         const key = `glyph_${cell.animal ?? cell.food}`;
         const image = scene.add.image(centerX, centerY, key);
-        fitInside(image, cellSize * 0.84);
+        fitInside(image, cellSize * 0.86);
         this.add(image);
       }
     }

@@ -656,14 +656,24 @@ export class PuzzleScene extends Phaser.Scene {
         },
         { label: 'New random', callback: () => this.startRandom() },
       ],
-      {
-        label: 'Music',
-        value: this.settings.musicVolume,
-        onChange: (musicVolume) => {
-          this.settings = this.save.updateSettings({ musicVolume });
-          this.music.setVolume(this.settings.musicVolume);
+      [
+        {
+          label: 'Effects volume',
+          value: this.settings.soundVolume,
+          onChange: (soundVolume) => {
+            this.settings = this.save.updateSettings({ soundVolume });
+            this.audio.setVolume(this.settings.soundVolume);
+          },
         },
-      },
+        {
+          label: 'Music',
+          value: this.settings.musicVolume,
+          onChange: (musicVolume) => {
+            this.settings = this.save.updateSettings({ musicVolume });
+            this.music.setVolume(this.settings.musicVolume);
+          },
+        },
+      ],
     );
     if (withSound) this.audio.play('note_open');
   }
@@ -703,13 +713,14 @@ export class PuzzleScene extends Phaser.Scene {
       primary?: boolean;
       sound?: SoundName | false;
     }>,
-    slider?: SliderSpec,
+    sliders?: readonly SliderSpec[],
   ): void {
     this.closeModal();
     const modal = this.add.container(800, 450).setDepth(2600);
     const shade = this.add.rectangle(0, 0, 1600, 900, COLORS.walnut, 0.26).setInteractive();
     const card = this.add.graphics();
-    const height = Math.max(330, 240 + Math.ceil(actions.length / 2) * 62) + (slider ? 96 : 0);
+    const height =
+      Math.max(330, 240 + Math.ceil(actions.length / 2) * 62) + (sliders?.length ?? 0) * 88;
     card.fillStyle(COLORS.shadow, 0.17);
     card.fillRoundedRect(-312, -height / 2 + 12, 640, height, 38);
     card.fillStyle(COLORS.milk, 1);
@@ -735,7 +746,9 @@ export class PuzzleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     modal.add([shade, card, title, body]);
-    if (slider) this.makeSlider(modal, -height / 2 + 218, slider);
+    sliders?.forEach((slider, index) => {
+      this.makeSlider(modal, -height / 2 + 218 + index * 88, slider);
+    });
     const columns = actions.length === 1 ? 1 : 2;
     const rowCount = Math.ceil(actions.length / columns);
     actions.forEach((action, index) => {

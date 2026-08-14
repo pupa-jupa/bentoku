@@ -9,6 +9,7 @@ Bentoku is a finished client-side browser puzzle about arranging nine tiny kawai
 - Drop one placed piece onto another to swap them.
 - Drop a placed piece back on the tray to return it.
 - Choose Cozy, Gentle, Clever, Tricky, or Master from the difficulty button. Every level is deduction-only; higher levels use longer chains instead of guesses. Master leaves at least one café-map cell blank and links five or six substantial sliding sketches.
+- Set effects and music volume independently in Cozy settings; the Effects switch remains available for quick muting.
 - Use `Tab` or arrow keys to move focus, `Enter`/`Space` to select or place, `U` to undo, `H` for help, `D` for difficulty, and `S` for settings.
 - Click the seed to copy a shareable link. Daily and random bentos work without a backend.
 

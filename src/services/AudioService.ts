@@ -5,6 +5,7 @@ import { soundAssets, type SoundName } from './AssetRegistry';
 export class AudioService {
   private readonly scene: Phaser.Scene;
   private enabled: boolean;
+  private volume: number;
   private disposed = false;
   private readonly active = new Set<Phaser.Sound.BaseSound>();
   private readonly pending = new Set<Phaser.Time.TimerEvent>();
@@ -12,6 +13,7 @@ export class AudioService {
   constructor(scene: Phaser.Scene, settings: PlayerSettings) {
     this.scene = scene;
     this.enabled = settings.sound;
+    this.volume = Phaser.Math.Clamp(settings.soundVolume, 0, 1);
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.dispose());
   }
 
@@ -20,8 +22,16 @@ export class AudioService {
     if (!enabled) [...this.active].forEach((sound) => this.release(sound));
   }
 
+  setVolume(volume: number): void {
+    this.volume = Phaser.Math.Clamp(volume, 0, 1);
+    this.active.forEach((sound) => {
+      const adjustable = sound as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound;
+      adjustable.setVolume(this.volume);
+    });
+  }
+
   play(name: SoundName, delayMs = 0): void {
-    if (!this.enabled || this.disposed) return;
+    if (!this.enabled || this.volume <= 0 || this.disposed) return;
     if (delayMs <= 0) {
       this.playNow(name);
       return;
@@ -29,7 +39,7 @@ export class AudioService {
 
     const timer = this.scene.time.delayedCall(delayMs, () => {
       this.pending.delete(timer);
-      if (this.enabled && !this.disposed) this.playNow(name);
+      if (this.enabled && this.volume > 0 && !this.disposed) this.playNow(name);
     });
     this.pending.add(timer);
   }
@@ -45,7 +55,7 @@ export class AudioService {
   private playNow(name: SoundName): void {
     const asset = soundAssets[name];
     if (!this.scene.cache.audio.exists(asset.key)) return;
-    const sound = this.scene.sound.add(asset.key, { volume: 1, loop: false });
+    const sound = this.scene.sound.add(asset.key, { volume: this.volume, loop: false });
     this.active.add(sound);
     sound.once(Phaser.Sound.Events.COMPLETE, () => this.release(sound));
     if (!sound.play()) this.release(sound);

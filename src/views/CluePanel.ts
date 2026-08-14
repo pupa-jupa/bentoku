@@ -45,8 +45,8 @@ export class CluePanel extends Phaser.GameObjects.Container {
         scene,
         clue,
         xPosition,
-        compact ? 10 + row * 108 : 20 + row * 138,
-        compact ? 150 : 158,
+        compact ? 6 + row * 116 : 20 + row * 138,
+        158,
         compact,
       );
       this.add(view);

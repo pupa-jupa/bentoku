@@ -8,7 +8,7 @@ Bentoku is a finished client-side browser puzzle about arranging nine tiny kawai
 - Drag a piece directly into the box.
 - Drop one placed piece onto another to swap them.
 - Drop a placed piece back on the tray to return it.
-- Choose Cozy, Gentle, Clever, or Tricky from the difficulty button. Every level is deduction-only; higher levels use longer chains instead of guesses.
+- Choose Cozy, Gentle, Clever, Tricky, or Master from the difficulty button. Every level is deduction-only; higher levels use longer chains instead of guesses. Master leaves at least one café-map cell blank and links five or six substantial sliding sketches.
 - Use `Tab` or arrow keys to move focus, `Enter`/`Space` to select or place, `U` to undo, `H` for help, `D` for difficulty, and `S` for settings.
 - Click the seed to copy a shareable link. Daily and random bentos work without a backend.
 
@@ -27,7 +27,7 @@ pnpm assets:build
 pnpm assets:verify
 ```
 
-The 10,000-puzzle suite is part of `pnpm test` and covers all four difficulty levels. It independently verifies public-rule uniqueness and completion by the deterministic deduction solver. All art is prepared ahead of time and shipped as lossless WebP assets; the production game never calls an image-generation API. Source PNG files remain under `art/` and never enter the runtime bundle. `assets:verify` decodes both source and WebP files and verifies pixel-identical visible RGBA data.
+The 12,500-puzzle suite is part of `pnpm test` and covers all five difficulty levels. It independently verifies public-rule uniqueness and completion by the deterministic deduction solver. All art is prepared ahead of time and shipped as lossless WebP assets; the production game never calls an image-generation API. Source PNG files remain under `art/` and never enter the runtime bundle. `assets:verify` decodes both source and WebP files and verifies pixel-identical visible RGBA data.
 
 ## Architecture
 
@@ -36,7 +36,7 @@ The 10,000-puzzle suite is part of `pnpm test` and covers all four difficulty le
 - Seeded solution-first generator
 - A public-rule exact solver that considers all 12 visible pieces
 - A separate no-assumption deduction solver using constraint propagation, sliding-pattern support, complete-family elimination, and all-different matching
-- Information-gain clue selection and four measured deduction profiles
+- Information-gain clue selection and five measured deduction profiles
 - Local persistence, softly synthesized sound effects, and a compressed gently faded BGM playlist
 - No backend and no runtime network dependency for game logic or art
 

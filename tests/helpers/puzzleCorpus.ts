@@ -1,12 +1,18 @@
 import { expect } from 'vitest';
+import { DIFFICULTY_PROFILES } from '../../src/puzzle/DifficultyEvaluator';
 import { solveHumanly } from '../../src/puzzle/HumanSolver';
 import { PuzzleGenerator } from '../../src/puzzle/PuzzleGenerator';
 import { countSolutions } from '../../src/puzzle/PuzzleSolver';
 import type { Difficulty } from '../../src/puzzle/types';
 
-export const assertDeductiveCorpus = (difficulty: Difficulty, sampleCount = 2_500): void => {
+export const assertDeductiveCorpus = (
+  difficulty: Difficulty,
+  sampleCount = 2_500,
+  startIndex = 0,
+): void => {
   const generator = new PuzzleGenerator();
-  for (let index = 0; index < sampleCount; index += 1) {
+  for (let offset = 0; offset < sampleCount; offset += 1) {
+    const index = startIndex + offset;
     const puzzle = generator.create(
       `BENTO-${difficulty[0]}${index.toString(36).padStart(5, '0')}`,
       difficulty,
@@ -21,7 +27,9 @@ export const assertDeductiveCorpus = (difficulty: Difficulty, sampleCount = 2_50
     expect(solutionIds).toHaveLength(9);
     expect(new Set(solutionIds).size).toBe(9);
     expect(puzzle.pieces.filter((piece) => solutionAnimals.has(piece.animal))).toHaveLength(9);
-    expect(puzzle.clues.length).toBeLessThanOrEqual(5);
+    expect(puzzle.clues.length).toBeLessThanOrEqual(
+      DIFFICULTY_PROFILES[difficulty].maxSpatialClues + 1,
+    );
     expect(puzzle.clues.every((clue) => clue.width <= 3 && clue.height <= 3)).toBe(true);
     expect(countSolutions(puzzle, 2), `${puzzle.seed} ${difficulty}`).toBe(1);
     expect(human.solved, `${puzzle.seed} ${difficulty}`).toBe(true);

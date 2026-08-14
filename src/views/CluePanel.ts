@@ -25,7 +25,8 @@ export class CluePanel extends Phaser.GameObjects.Container {
     this.add([flower, leaf, title]);
 
     const anchor = clues.find((clue) => clue.id === 'anchor-map');
-    const spatial = clues.filter((clue) => clue.id !== 'anchor-map').slice(0, 4);
+    const spatial = clues.filter((clue) => clue.id !== 'anchor-map').slice(0, 6);
+    const compact = spatial.length > 4;
     if (anchor) {
       const view = new ClueView(scene, anchor, 0, -178, 282);
       this.add(view);
@@ -35,25 +36,19 @@ export class CluePanel extends Phaser.GameObjects.Container {
     divider.lineStyle(2, COLORS.ink, 0.16);
     divider.lineBetween(-156, -55, 156, -55);
     this.add(divider);
-    const sectionTitle = scene.add
-      .text(0, -38, 'SLIDING SKETCHES', {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '13px',
-        fontStyle: 'bold',
-        color: '#765b52',
-        letterSpacing: 1.5,
-      })
-      .setOrigin(0.5);
-    this.add(sectionTitle);
-    const sparkle = scene.add.image(149, -37, 'tiny_sparkle').setDisplaySize(20, 20).setAlpha(0.7);
-    this.add(sparkle);
-
     spatial.forEach((clue, index) => {
       const row = Math.floor(index / 2);
       const itemsInRow = Math.min(2, spatial.length - row * 2);
       const column = index % 2;
-      const xPosition = itemsInRow === 1 ? 0 : -84 + column * 168;
-      const view = new ClueView(scene, clue, xPosition, 52 + row * 166, 158);
+      const xPosition = itemsInRow === 1 ? 0 : -82 + column * 164;
+      const view = new ClueView(
+        scene,
+        clue,
+        xPosition,
+        compact ? 10 + row * 108 : 20 + row * 138,
+        compact ? 150 : 158,
+        compact,
+      );
       this.add(view);
     });
 

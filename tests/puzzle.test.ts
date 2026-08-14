@@ -80,7 +80,28 @@ describe('puzzle generator and public solver', () => {
     expect(human).toMatchObject({ solved: true, stalled: false, board: puzzle.solution });
   });
 
-  it('orders the four levels by measured deduction complexity', () => {
+  it('builds Master puzzles from a partial café map and several substantial sketches', () => {
+    const puzzle = generator.create('BENTO-MASTER-01', 'Master');
+    const anchor = puzzle.clues.find((clue) => clue.id === 'anchor-map')!;
+    const sketches = puzzle.clues.filter((clue) => clue.id !== 'anchor-map');
+
+    expect(anchor.cells.length).toBeGreaterThanOrEqual(6);
+    expect(anchor.cells.length).toBeLessThan(9);
+    expect(sketches.length).toBeGreaterThanOrEqual(5);
+    expect(sketches.length).toBeLessThanOrEqual(6);
+    expect(sketches.every((clue) => clue.cells.length >= 3)).toBe(true);
+    expect(
+      sketches.every((clue) => clue.cells.filter((cell) => cell.animal || cell.food).length >= 3),
+    ).toBe(true);
+    expect(countSolutions(puzzle, 2)).toBe(1);
+    expect(solveHumanly(puzzle)).toMatchObject({
+      solved: true,
+      stalled: false,
+      board: puzzle.solution,
+    });
+  });
+
+  it('orders the five levels by measured deduction complexity', () => {
     const scores = new Map<Difficulty, number>();
     for (const difficulty of DIFFICULTIES) {
       let totalScore = 0;
@@ -93,5 +114,6 @@ describe('puzzle generator and public solver', () => {
     expect(scores.get('Cozy')!).toBeLessThan(scores.get('Gentle')!);
     expect(scores.get('Gentle')!).toBeLessThan(scores.get('Clever')!);
     expect(scores.get('Clever')!).toBeLessThan(scores.get('Tricky')!);
-  });
+    expect(scores.get('Tricky')!).toBeLessThan(scores.get('Master')!);
+  }, 20_000);
 });

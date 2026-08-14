@@ -5,7 +5,10 @@ export class HintController {
 
   explain(puzzle: PuzzleDefinition): string {
     const spatialCount = puzzle.clues.filter((clue) => clue.width < 3 || clue.height < 3).length;
-    return `Use exactly three complete animal families—egg, rice, and sandwich—so one whole family remains on the tray. Each little sketch can slide anywhere inside the 3 × 3 box while its symbols keep the same relative positions. You have ${spatialCount} movable ${spatialCount === 1 ? 'sketch' : 'sketches'} and one fixed café map.`;
+    const anchor = puzzle.clues.find((clue) => clue.id === 'anchor-map');
+    const partialMapNote =
+      anchor && anchor.cells.length < 9 ? ' Blank map cells give no information.' : '';
+    return `Use exactly three complete animal families—egg, rice, and sandwich—so one whole family remains on the tray. Each little sketch can slide anywhere inside the 3 × 3 box while its symbols keep the same relative positions. You have ${spatialCount} movable ${spatialCount === 1 ? 'sketch' : 'sketches'} and one fixed café map.${partialMapNote}`;
   }
 
   nudge(puzzle: PuzzleDefinition): string {

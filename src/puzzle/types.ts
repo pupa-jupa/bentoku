@@ -1,6 +1,6 @@
 export const ANIMALS = ['cat', 'bear', 'pig', 'bunny'] as const;
 export const FOODS = ['egg', 'rice', 'sandwich'] as const;
-export const DIFFICULTIES = ['Cozy', 'Gentle', 'Clever', 'Tricky'] as const;
+export const DIFFICULTIES = ['Cozy', 'Gentle', 'Clever', 'Tricky', 'Master'] as const;
 
 export type Animal = (typeof ANIMALS)[number];
 export type Food = (typeof FOODS)[number];

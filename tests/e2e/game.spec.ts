@@ -172,8 +172,8 @@ test('lets the player switch deduction difficulty and preserves the choice', asy
   const difficultyButton = await screenPoint(page, 1034, 54);
   await page.mouse.click(difficultyButton.x, difficultyButton.y);
 
-  const trickyButton = await screenPoint(page, 935, 602);
-  await page.mouse.click(trickyButton.x, trickyButton.y);
+  const masterButton = await screenPoint(page, 665, 613);
+  await page.mouse.click(masterButton.x, masterButton.y);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -189,7 +189,7 @@ test('lets the player switch deduction difficulty and preserves the choice', asy
         };
       }),
     )
-    .toEqual({ difficulty: 'Tricky', query: 'tricky', filled: 0 });
+    .toEqual({ difficulty: 'Master', query: 'master', filled: 0 });
 
   await page.reload();
   await expect
@@ -203,5 +203,5 @@ test('lets the player switch deduction difficulty and preserves the choice', asy
         return game?.scene.getScene('PuzzleScene')?.puzzle?.difficulty ?? null;
       }),
     )
-    .toBe('Tricky');
+    .toBe('Master');
 });

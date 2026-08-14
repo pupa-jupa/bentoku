@@ -164,24 +164,23 @@ const makeSpatialClue = (
   difficulty: Difficulty,
   id: string,
 ): CluePattern => {
+  const profile = DIFFICULTY_PROFILES[difficulty];
   const originX = rng.int(4 - geometry.width);
   const originY = rng.int(4 - geometry.height);
   const cells = geometry.cells.map(([x, y]) => {
     const pieceId = solution[(originY + y) * 3 + originX + x]!;
     return revealFor(pieces.get(pieceId)!, rng, difficulty, x, y);
   });
-  if (cells.filter((cell) => cell.animal || cell.food).length < 2) {
-    const [first, second] = cells;
-    if (first) {
-      const [x, y] = geometry.cells[0]!;
-      const pieceId = solution[(originY + y) * 3 + originX + x]!;
-      first.animal = pieces.get(pieceId)!.animal;
-    }
-    if (second) {
-      const [x, y] = geometry.cells[1]!;
-      const pieceId = solution[(originY + y) * 3 + originX + x]!;
-      second.food = pieces.get(pieceId)!.food;
-    }
+  let visibleMarks = cells.filter((cell) => cell.animal || cell.food).length;
+  for (let index = 0; visibleMarks < profile.minSpatialMarks && index < cells.length; index += 1) {
+    const cell = cells[index]!;
+    if (cell.animal || cell.food) continue;
+    const [x, y] = geometry.cells[index]!;
+    const pieceId = solution[(originY + y) * 3 + originX + x]!;
+    const piece = pieces.get(pieceId)!;
+    if (visibleMarks % 2 === 0) cell.animal = piece.animal;
+    else cell.food = piece.food;
+    visibleMarks += 1;
   }
   return { id, name: geometry.name, width: geometry.width, height: geometry.height, cells };
 };
@@ -192,29 +191,33 @@ const makeAnchorClue = (
   rng: SeededRandom,
   difficulty: Difficulty,
 ): CluePattern => {
-  const exactPositions = new Set(
-    rng
-      .shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8])
-      .slice(0, DIFFICULTY_PROFILES[difficulty].anchorExactCells),
-  );
+  const profile = DIFFICULTY_PROFILES[difficulty];
+  const shuffledPositions = rng.shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  const visiblePositions = new Set(shuffledPositions.slice(0, profile.anchorVisibleCells));
+  const exactPositions = new Set(shuffledPositions.slice(0, profile.anchorExactCells));
   return {
     id: 'anchor-map',
     name: 'café map',
     width: 3,
     height: 3,
-    cells: solution.map((pieceId, index) => {
+    cells: solution.flatMap((pieceId, index): ClueCell[] => {
+      if (!visiblePositions.has(index)) return [];
       const piece = pieces.get(pieceId)!;
       if (exactPositions.has(index)) {
-        return {
-          x: index % 3,
-          y: Math.floor(index / 3),
-          animal: piece.animal,
-          food: piece.food,
-        };
+        return [
+          {
+            x: index % 3,
+            y: Math.floor(index / 3),
+            animal: piece.animal,
+            food: piece.food,
+          },
+        ];
       }
-      return rng.next() < 0.5
-        ? { x: index % 3, y: Math.floor(index / 3), animal: piece.animal }
-        : { x: index % 3, y: Math.floor(index / 3), food: piece.food };
+      return [
+        rng.next() < 0.5
+          ? { x: index % 3, y: Math.floor(index / 3), animal: piece.animal }
+          : { x: index % 3, y: Math.floor(index / 3), food: piece.food },
+      ];
     }),
   };
 };
@@ -233,12 +236,21 @@ const exactAnchorAt = (
 ): CluePattern => {
   const next = cloneClue(anchor);
   const piece = pieces.get(solution[position]!)!;
-  next.cells[position] = {
+  const cellIndex = next.cells.findIndex(
+    (cell) => cell.x === position % 3 && cell.y === Math.floor(position / 3),
+  );
+  const exactCell: ClueCell = {
     x: position % 3,
     y: Math.floor(position / 3),
     animal: piece.animal,
     food: piece.food,
   };
+  if (cellIndex < 0) {
+    next.cells.push(exactCell);
+    next.cells.sort((first, second) => first.y * 3 + first.x - (second.y * 3 + second.x));
+  } else {
+    next.cells[cellIndex] = exactCell;
+  }
   return next;
 };
 
@@ -260,7 +272,14 @@ export class PuzzleGenerator {
 
     let anchor = makeAnchorClue(solutionIds, pieceMap, clueRng, difficulty);
     const selectedClues: CluePattern[] = [];
-    const geometries = clueRng.shuffle([...GEOMETRIES, ...clueRng.shuffle(GEOMETRIES).slice(0, 5)]);
+    const eligibleGeometries = GEOMETRIES.filter(
+      (geometry) => geometry.cells.length >= DIFFICULTY_PROFILES[difficulty].minSpatialCells,
+    );
+    const geometries = clueRng.shuffle(
+      difficulty === 'Master'
+        ? [...eligibleGeometries, ...clueRng.shuffle(eligibleGeometries)]
+        : [...eligibleGeometries, ...clueRng.shuffle(eligibleGeometries).slice(0, 5)],
+    );
     const candidates = geometries.map((geometry, index) =>
       makeSpatialClue(
         solutionIds,
@@ -274,7 +293,11 @@ export class PuzzleGenerator {
     let humanResult = solveHumanly({ pieces, clues: [anchor] });
     const profile = DIFFICULTY_PROFILES[difficulty];
 
-    while (!humanResult.solved && selectedClues.length < profile.maxSpatialClues) {
+    while (
+      (!humanResult.solved || selectedClues.length < profile.minSpatialClues) &&
+      selectedClues.length < profile.maxSpatialClues &&
+      candidates.length > 0
+    ) {
       const currentUncertainty = logicalUncertainty(humanResult);
       let bestIndex = 0;
       let bestResult = solveHumanly({ pieces, clues: [anchor, ...selectedClues, candidates[0]!] });
@@ -302,20 +325,26 @@ export class PuzzleGenerator {
     }
 
     while (!humanResult.solved) {
-      const unresolvedPositions = anchor.cells
-        .map((cell, position) => ({ cell, position }))
-        .filter(({ cell }) => !cell.animal || !cell.food);
+      const partialPositions = anchor.cells
+        .map((cell) => ({ cell, position: cell.y * 3 + cell.x }))
+        .filter(({ cell }) => !cell.animal || !cell.food)
+        .map(({ position }) => position);
+      const occupiedPositions = new Set(anchor.cells.map((cell) => cell.y * 3 + cell.x));
+      const missingPositions = Array.from({ length: 9 }, (_, position) => position).filter(
+        (position) => !occupiedPositions.has(position),
+      );
+      const unresolvedPositions =
+        partialPositions.length > 0
+          ? partialPositions
+          : anchor.cells.length < profile.maxAnchorCells
+            ? missingPositions
+            : [];
       if (unresolvedPositions.length === 0) break;
 
-      let bestAnchor = exactAnchorAt(
-        anchor,
-        unresolvedPositions[0]!.position,
-        solutionIds,
-        pieceMap,
-      );
+      let bestAnchor = exactAnchorAt(anchor, unresolvedPositions[0]!, solutionIds, pieceMap);
       let bestResult = solveHumanly({ pieces, clues: [bestAnchor, ...selectedClues] });
       let bestScore = Number.NEGATIVE_INFINITY;
-      for (const { position } of unresolvedPositions) {
+      for (const position of unresolvedPositions) {
         const candidateAnchor = exactAnchorAt(anchor, position, solutionIds, pieceMap);
         const result = solveHumanly({ pieces, clues: [candidateAnchor, ...selectedClues] });
         const score =

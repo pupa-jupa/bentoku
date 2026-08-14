@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardSatisfiesPuzzle } from '../src/puzzle/ConstraintEvaluator';
+import { boardSatisfiesPuzzle, getClueOffsets } from '../src/puzzle/ConstraintEvaluator';
 import { solveHumanly } from '../src/puzzle/HumanSolver';
 import { createAllPieces, createPieceMap } from '../src/puzzle/PieceFactory';
 import { PuzzleGenerator } from '../src/puzzle/PuzzleGenerator';
@@ -99,6 +99,24 @@ describe('puzzle generator and public solver', () => {
       stalled: false,
       board: puzzle.solution,
     });
+  });
+
+  it('generates the fourth fixed L orientation as a translation-only sketch', () => {
+    const puzzle = generator.create('BENTO-G00000', 'Gentle');
+    const rightCorner = puzzle.clues.find((clue) => clue.name === 'right corner');
+
+    expect(rightCorner).toBeDefined();
+    expect(rightCorner!.cells.map((cell) => `${cell.x},${cell.y}`).sort()).toEqual([
+      '0,0',
+      '1,0',
+      '1,1',
+    ]);
+    expect(getClueOffsets(rightCorner!)).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ]);
   });
 
   it('orders the five levels by measured deduction complexity', () => {

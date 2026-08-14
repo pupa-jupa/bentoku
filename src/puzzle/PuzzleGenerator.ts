@@ -103,6 +103,16 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
+    name: 'right corner',
+    width: 2,
+    height: 2,
+    cells: [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+    ],
+  },
+  {
     name: 'T shape',
     width: 3,
     height: 2,

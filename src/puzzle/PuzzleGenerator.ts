@@ -9,6 +9,7 @@ import {
   type Animal,
   type BentoPiece,
   type ClueCell,
+  type ClueName,
   type CluePattern,
   type Difficulty,
   type PieceId,
@@ -16,15 +17,25 @@ import {
 } from './types';
 
 interface Geometry {
-  name: string;
+  name: ClueName;
   width: number;
   height: number;
   cells: Array<[number, number]>;
 }
 
+// Preserve the historical generator salt so existing shared URLs continue to
+// produce the same puzzle after difficulty IDs become locale-neutral.
+const DIFFICULTY_SEED_SALTS: Record<Difficulty, string> = {
+  cozy: 'Cozy',
+  gentle: 'Gentle',
+  clever: 'Clever',
+  tricky: 'Tricky',
+  master: 'Master',
+};
+
 const GEOMETRIES: Geometry[] = [
   {
-    name: 'little row',
+    name: 'littleRow',
     width: 2,
     height: 1,
     cells: [
@@ -33,7 +44,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'little column',
+    name: 'littleColumn',
     width: 1,
     height: 2,
     cells: [
@@ -42,7 +53,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'long row',
+    name: 'longRow',
     width: 3,
     height: 1,
     cells: [
@@ -52,7 +63,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'long column',
+    name: 'longColumn',
     width: 1,
     height: 3,
     cells: [
@@ -73,7 +84,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'L turn',
+    name: 'lTurn',
     width: 2,
     height: 2,
     cells: [
@@ -83,7 +94,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'reverse L',
+    name: 'reverseL',
     width: 2,
     height: 2,
     cells: [
@@ -103,7 +114,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'right corner',
+    name: 'rightCorner',
     width: 2,
     height: 2,
     cells: [
@@ -113,7 +124,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'T shape',
+    name: 'tShape',
     width: 3,
     height: 2,
     cells: [
@@ -124,7 +135,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'S shape',
+    name: 'sShape',
     width: 3,
     height: 2,
     cells: [
@@ -135,7 +146,7 @@ const GEOMETRIES: Geometry[] = [
     ],
   },
   {
-    name: 'Z shape',
+    name: 'zShape',
     width: 3,
     height: 2,
     cells: [
@@ -207,7 +218,7 @@ const makeAnchorClue = (
   const exactPositions = new Set(shuffledPositions.slice(0, profile.anchorExactCells));
   return {
     id: 'anchor-map',
-    name: 'café map',
+    name: 'cafeMap',
     width: 3,
     height: 3,
     cells: solution.flatMap((pieceId, index): ClueCell[] => {
@@ -265,10 +276,10 @@ const exactAnchorAt = (
 };
 
 export class PuzzleGenerator {
-  create(rawSeed: string, difficulty: Difficulty = 'Gentle'): PuzzleDefinition {
+  create(rawSeed: string, difficulty: Difficulty = 'gentle'): PuzzleDefinition {
     const seed = normalizeSeed(rawSeed);
     const solutionRng = new SeededRandom(seed);
-    const clueRng = new SeededRandom(`${seed}:${difficulty}`);
+    const clueRng = new SeededRandom(`${seed}:${DIFFICULTY_SEED_SALTS[difficulty]}`);
     const pieces = createAllPieces();
     const pieceMap = createPieceMap(pieces);
     const includedAnimals = solutionRng.shuffle(ANIMALS).slice(0, 3) as [Animal, Animal, Animal];
@@ -286,7 +297,7 @@ export class PuzzleGenerator {
       (geometry) => geometry.cells.length >= DIFFICULTY_PROFILES[difficulty].minSpatialCells,
     );
     const geometries = clueRng.shuffle(
-      difficulty === 'Master'
+      difficulty === 'master'
         ? [...eligibleGeometries, ...clueRng.shuffle(eligibleGeometries)]
         : [...eligibleGeometries, ...clueRng.shuffle(eligibleGeometries).slice(0, 5)],
     );

@@ -1,11 +1,31 @@
 export const ANIMALS = ['cat', 'bear', 'pig', 'bunny'] as const;
 export const FOODS = ['egg', 'rice', 'sandwich'] as const;
-export const DIFFICULTIES = ['Cozy', 'Gentle', 'Clever', 'Tricky', 'Master'] as const;
+export const DIFFICULTIES = ['cozy', 'gentle', 'clever', 'tricky', 'master'] as const;
+export const LANGUAGES = ['en', 'ru'] as const;
+export const GAME_MODES = ['standard', 'timed'] as const;
+export const CLUE_NAMES = [
+  'littleRow',
+  'littleColumn',
+  'longRow',
+  'longColumn',
+  'square',
+  'lTurn',
+  'reverseL',
+  'corner',
+  'rightCorner',
+  'tShape',
+  'sShape',
+  'zShape',
+  'cafeMap',
+] as const;
 
 export type Animal = (typeof ANIMALS)[number];
 export type Food = (typeof FOODS)[number];
 export type PieceId = `${Animal}_${Food}`;
 export type Difficulty = (typeof DIFFICULTIES)[number];
+export type Language = (typeof LANGUAGES)[number];
+export type GameMode = (typeof GAME_MODES)[number];
+export type ClueName = (typeof CLUE_NAMES)[number];
 
 export interface BentoPiece {
   id: PieceId;
@@ -36,7 +56,7 @@ export interface ClueCell {
 
 export interface CluePattern {
   id: string;
-  name: string;
+  name: ClueName;
   width: number;
   height: number;
   cells: ClueCell[];
@@ -88,25 +108,36 @@ export interface PuzzleDefinition {
 }
 
 export interface PlayerSettings {
+  language: Language;
   sound: boolean;
   soundVolume: number;
   musicVolume: number;
   reducedMotion: boolean;
   hintMode: boolean;
   difficulty: Difficulty;
+  mode: GameMode;
 }
 
 export interface SaveData {
-  version: 1;
+  version: 2;
   currentPuzzle?: {
     seed: string;
     difficulty: Difficulty;
+    mode: GameMode;
     board: Board;
     moves: number;
   };
   settings: PlayerSettings;
+  tutorial: {
+    completedVersion: number;
+  };
   stats: {
     solved: number;
+    timed: {
+      attempts: number;
+      wins: number;
+      bestRemainingMs: number;
+    };
   };
 }
 

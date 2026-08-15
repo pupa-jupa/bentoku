@@ -1,8 +1,15 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_BODY, FONT_DISPLAY } from '../game/constants';
+import type { I18nService } from '../i18n/I18nService';
 
 export class CelebrationView extends Phaser.GameObjects.Container {
-  constructor(scene: Phaser.Scene, onNext: () => void, onCopy: () => void) {
+  constructor(
+    scene: Phaser.Scene,
+    i18n: I18nService,
+    onNext: () => void,
+    onCopy: () => void,
+    bodyText = i18n.t('celebration.body'),
+  ) {
     super(scene, 800, 450);
     scene.add.existing(this);
     this.setDepth(3000);
@@ -19,7 +26,7 @@ export class CelebrationView extends Phaser.GameObjects.Container {
 
     const stamp = scene.add.image(0, -90, 'success_stamp').setDisplaySize(132, 132).setAngle(-7);
     const title = scene.add
-      .text(0, -6, 'Bento complete!', {
+      .text(0, -6, i18n.t('celebration.title'), {
         fontFamily: FONT_DISPLAY,
         fontSize: '34px',
         fontStyle: 'bold',
@@ -27,7 +34,7 @@ export class CelebrationView extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     const body = scene.add
-      .text(0, 40, 'A tiny tray of very happy friends.', {
+      .text(0, 40, bodyText, {
         fontFamily: FONT_BODY,
         fontSize: '19px',
         color: '#80675f',
@@ -35,8 +42,8 @@ export class CelebrationView extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
     this.add([stamp, title, body]);
 
-    this.add(this.button(scene, -100, 116, 'Copy seed', onCopy, false));
-    this.add(this.button(scene, 100, 116, 'Another bento', onNext, true));
+    this.add(this.button(scene, -100, 116, i18n.t('celebration.copy'), onCopy, false));
+    this.add(this.button(scene, 100, 116, i18n.t('celebration.next'), onNext, true));
     this.setAlpha(0).setScale(0.92);
     scene.tweens.add({ targets: this, alpha: 1, scale: 1, duration: 360, ease: 'Back.easeOut' });
   }

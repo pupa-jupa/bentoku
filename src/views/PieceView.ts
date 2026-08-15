@@ -5,7 +5,10 @@ import type { BentoPiece } from '../puzzle/types';
 export class PieceView extends Phaser.GameObjects.Container {
   readonly piece: BentoPiece;
   readonly sprite: Phaser.GameObjects.Image;
+  private readonly shell: Phaser.GameObjects.Image;
   private readonly shadow: Phaser.GameObjects.Ellipse;
+  private readonly glaze: Phaser.GameObjects.Image;
+  private readonly pearl: Phaser.GameObjects.Graphics;
   private readonly ring: Phaser.GameObjects.Graphics;
   home = new Phaser.Math.Vector2();
   boardCell: number | null = null;
@@ -13,6 +16,7 @@ export class PieceView extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, piece: BentoPiece, x: number, y: number) {
     super(scene, x, y);
     this.piece = piece;
+    this.shell = scene.add.image(0, 0, 'piece_shell').setDisplaySize(158, 158).setVisible(false);
     this.shadow = scene.add.ellipse(3, 35, 84, 28, COLORS.shadow, 0.18);
     // The source canvas intentionally includes generous transparent safety
     // padding. Scale and optically center the whole canvas; never trim it.
@@ -20,8 +24,16 @@ export class PieceView extends Phaser.GameObjects.Container {
     this.sprite = scene.add
       .image(visual.x, visual.y, piece.textureKey)
       .setDisplaySize(visual.size, visual.size);
+    this.glaze = scene.add
+      .image(visual.x, visual.y, piece.textureKey)
+      .setDisplaySize(visual.size, visual.size)
+      .setTint(0xfff3fb)
+      .setAlpha(0.13)
+      .setBlendMode(Phaser.BlendModes.SCREEN);
+    this.pearl = scene.add.graphics();
+    this.drawPearlGlint();
     this.ring = scene.add.graphics();
-    this.add([this.shadow, this.sprite, this.ring]);
+    this.add([this.shell, this.shadow, this.sprite, this.glaze, this.pearl, this.ring]);
     this.setSize(116, 116);
     this.setInteractive({ useHandCursor: true });
     scene.input.setDraggable(this);
@@ -31,6 +43,11 @@ export class PieceView extends Phaser.GameObjects.Container {
   setHome(x: number, y: number, boardCell: number | null): void {
     this.home.set(x, y);
     this.boardCell = boardCell;
+    const placed = boardCell !== null;
+    this.shell.setVisible(placed);
+    this.glaze.setAlpha(placed ? 0.2 : 0.13);
+    this.pearl.setAlpha(placed ? 0.95 : 0.68);
+    this.shadow.setScale(placed ? 1.08 : 1).setAlpha(placed ? 0.22 : 0.18);
   }
 
   setSelected(selected: boolean): void {
@@ -42,24 +59,16 @@ export class PieceView extends Phaser.GameObjects.Container {
     this.ring.strokeCircle(0, 0, 62);
   }
 
-  setFocused(focused: boolean): void {
-    if (!focused) {
-      this.setSelected(false);
-      return;
-    }
-    this.ring.clear();
-    this.ring.lineStyle(4, COLORS.sage, 1);
-    this.ring.strokeRoundedRect(-60, -60, 120, 120, 24);
-  }
-
   lift(): void {
-    this.shadow.setScale(1.18).setAlpha(0.26);
+    this.shadow.setScale(this.boardCell === null ? 1.18 : 1.25).setAlpha(0.26);
     this.scene.tweens.add({ targets: this, scale: 1.07, duration: 100, ease: 'Sine.easeOut' });
     this.setDepth(1000);
   }
 
   settle(reducedMotion: boolean): void {
-    this.shadow.setScale(1).setAlpha(0.18);
+    this.shadow
+      .setScale(this.boardCell === null ? 1 : 1.08)
+      .setAlpha(this.boardCell === null ? 0.18 : 0.22);
     if (reducedMotion) {
       this.setScale(1);
       return;
@@ -98,6 +107,15 @@ export class PieceView extends Phaser.GameObjects.Container {
       yoyo: true,
       ease: 'Sine.easeInOut',
     });
+  }
+
+  private drawPearlGlint(): void {
+    this.pearl.fillStyle(0xffffff, 0.78);
+    this.pearl.fillEllipse(-30, -31, 12, 6);
+    this.pearl.fillCircle(-23, -25, 3);
+    this.pearl.lineStyle(2, 0xffffff, 0.76);
+    this.pearl.lineBetween(31, -32, 31, -20);
+    this.pearl.lineBetween(25, -26, 37, -26);
   }
 }
 

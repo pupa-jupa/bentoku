@@ -20,16 +20,3 @@ export const COLORS = {
 
 export const FONT_BODY = 'Trebuchet MS, system-ui, sans-serif';
 export const FONT_DISPLAY = 'Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif';
-
-export const ANIMAL_LABELS = {
-  cat: 'Cat',
-  bear: 'Bear',
-  pig: 'Pig',
-  bunny: 'Bunny',
-} as const;
-
-export const FOOD_LABELS = {
-  egg: 'Egg',
-  rice: 'Rice',
-  sandwich: 'Sandwich',
-} as const;

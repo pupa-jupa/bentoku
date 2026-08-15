@@ -118,4 +118,3 @@ shape, scale, transparent padding, and gameplay geometry.
 
 Create a Vercel Preview only after implementation and local verification. Production deployment and
 custom-domain changes require explicit approval after the preview is reviewed.
-

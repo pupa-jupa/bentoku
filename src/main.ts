@@ -3,9 +3,7 @@ import { createGameConfig } from './game/config';
 import './styles.css';
 
 const game = new Phaser.Game(createGameConfig());
-game.canvas.setAttribute('tabindex', '0');
-game.canvas.setAttribute('aria-label', 'Bentoku cozy bento deduction puzzle');
-game.canvas.addEventListener('pointerdown', () => game.canvas.focus());
+game.canvas.setAttribute('aria-label', 'Bentoku');
 
 declare global {
   interface Window {

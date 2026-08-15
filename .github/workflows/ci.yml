@@ -21,6 +21,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm assets:verify
       - run: pnpm lint
+      - run: pnpm format:check
       - run: pnpm test
       - run: pnpm build
       - run: pnpm test:e2e

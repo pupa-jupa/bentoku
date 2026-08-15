@@ -1,18 +1,25 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_DISPLAY } from '../game/constants';
 import type { CluePattern } from '../puzzle/types';
+import type { I18nService } from '../i18n/I18nService';
 import { ClueView } from './ClueView';
 
 export class CluePanel extends Phaser.GameObjects.Container {
   readonly width = 390;
   readonly height = 730;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, clues: readonly CluePattern[]) {
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    clues: readonly CluePattern[],
+    i18n: I18nService,
+  ) {
     super(scene, x, y);
     scene.add.existing(this);
 
     const title = scene.add
-      .text(0, -300, 'ORDER NOTES', {
+      .text(0, -300, i18n.t('clues.title'), {
         fontFamily: FONT_DISPLAY,
         fontSize: '25px',
         fontStyle: 'bold',
@@ -54,7 +61,7 @@ export class CluePanel extends Phaser.GameObjects.Container {
 
     if (spatial.length === 0) {
       const complete = scene.add
-        .text(0, 92, 'The café map has every detail you need.', {
+        .text(0, 92, i18n.t('clues.anchorOnly'), {
           fontFamily: 'Trebuchet MS, sans-serif',
           fontSize: '16px',
           color: '#7b6963',

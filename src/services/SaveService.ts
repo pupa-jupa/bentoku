@@ -3,29 +3,49 @@ import {
   emptyBoard,
   toBoard,
   type Difficulty,
+  type GameMode,
+  type Language,
   type PlayerSettings,
   type SaveData,
 } from '../puzzle/types';
 
-const STORAGE_KEY = 'bentoku.save.v1';
+const STORAGE_KEY = 'bentoku.save.v2';
+const LEGACY_STORAGE_KEY = 'bentoku.save.v1';
 const DEFAULT_SOUND_VOLUME = 1;
 const DEFAULT_MUSIC_VOLUME = 0.35;
+export const TUTORIAL_VERSION = 1;
 
 const clampVolume = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;
 
+const parseLanguage = (value: unknown): Language => (value === 'ru' ? 'ru' : 'en');
+const parseMode = (value: unknown): GameMode => (value === 'timed' ? 'timed' : 'standard');
+const finiteNonNegative = (value: unknown, fallback = 0): number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
+
 const defaults = (): SaveData => ({
-  version: 1,
+  version: 2,
   settings: {
+    language: 'en',
     sound: true,
     soundVolume: DEFAULT_SOUND_VOLUME,
     musicVolume: DEFAULT_MUSIC_VOLUME,
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     hintMode: true,
-    difficulty: 'Gentle',
+    difficulty: 'gentle',
+    mode: 'standard',
   },
-  stats: { solved: 0 },
+  tutorial: { completedVersion: 0 },
+  stats: {
+    solved: 0,
+    timed: { attempts: 0, wins: 0, bestRemainingMs: 0 },
+  },
 });
+
+type StoredRecord = Record<string, unknown>;
+
+const asRecord = (value: unknown): StoredRecord =>
+  value && typeof value === 'object' ? (value as StoredRecord) : {};
 
 export class SaveService {
   private data: SaveData;
@@ -35,31 +55,73 @@ export class SaveService {
   }
 
   private load(): SaveData {
+    const fallback = defaults();
     try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '') as Partial<SaveData>;
-      if (parsed.version !== 1) return defaults();
+      const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (!raw) return fallback;
+      const parsed = asRecord(JSON.parse(raw));
+      const settings = asRecord(parsed.settings);
+      const stats = asRecord(parsed.stats);
+      const timed = asRecord(stats.timed);
+      const tutorial = asRecord(parsed.tutorial);
+      const current = asRecord(parsed.currentPuzzle);
+      const difficulty = parseDifficulty(String(settings.difficulty ?? '')) ?? 'gentle';
+      const currentDifficulty = parseDifficulty(String(current.difficulty ?? ''));
+      const currentBoard = Array.isArray(current.board) ? current.board : undefined;
+      const currentPuzzle =
+        typeof current.seed === 'string' && currentDifficulty && currentBoard?.length === 9
+          ? {
+              seed: current.seed,
+              difficulty: currentDifficulty,
+              mode: parseMode(current.mode),
+              board: toBoard(currentBoard),
+              moves: finiteNonNegative(current.moves),
+            }
+          : undefined;
+
       return {
-        ...defaults(),
-        ...parsed,
+        version: 2,
         settings: {
-          ...defaults().settings,
-          ...parsed.settings,
-          soundVolume: clampVolume(parsed.settings?.soundVolume, DEFAULT_SOUND_VOLUME),
+          language: parseLanguage(settings.language),
+          sound: typeof settings.sound === 'boolean' ? settings.sound : fallback.settings.sound,
+          soundVolume: clampVolume(settings.soundVolume, DEFAULT_SOUND_VOLUME),
           musicVolume: clampVolume(
-            parsed.settings?.musicVolume,
-            parsed.settings?.sound === false ? 0 : DEFAULT_MUSIC_VOLUME,
+            settings.musicVolume,
+            settings.sound === false ? 0 : DEFAULT_MUSIC_VOLUME,
           ),
-          difficulty: parseDifficulty(parsed.settings?.difficulty) ?? 'Gentle',
+          reducedMotion:
+            typeof settings.reducedMotion === 'boolean'
+              ? settings.reducedMotion
+              : fallback.settings.reducedMotion,
+          hintMode:
+            typeof settings.hintMode === 'boolean' ? settings.hintMode : fallback.settings.hintMode,
+          difficulty,
+          mode: parseMode(settings.mode),
         },
-        stats: { ...defaults().stats, ...parsed.stats },
+        currentPuzzle,
+        tutorial: {
+          completedVersion: finiteNonNegative(tutorial.completedVersion),
+        },
+        stats: {
+          solved: finiteNonNegative(stats.solved),
+          timed: {
+            attempts: finiteNonNegative(timed.attempts),
+            wins: finiteNonNegative(timed.wins),
+            bestRemainingMs: finiteNonNegative(timed.bestRemainingMs),
+          },
+        },
       };
     } catch {
-      return defaults();
+      return fallback;
     }
   }
 
   private persist(): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+    } catch {
+      // The game remains playable when storage is unavailable or full.
+    }
   }
 
   get settings(): PlayerSettings {
@@ -70,6 +132,10 @@ export class SaveService {
     return this.data.stats.solved;
   }
 
+  get timedStats(): Readonly<SaveData['stats']['timed']> {
+    return { ...this.data.stats.timed };
+  }
+
   get currentSeed(): string | undefined {
     return this.data.currentPuzzle?.seed;
   }
@@ -78,12 +144,26 @@ export class SaveService {
     return parseDifficulty(this.data.currentPuzzle?.difficulty);
   }
 
+  get currentMode(): GameMode | undefined {
+    return this.data.currentPuzzle?.mode;
+  }
+
+  get tutorialCompleted(): boolean {
+    return this.data.tutorial.completedVersion >= TUTORIAL_VERSION;
+  }
+
   loadPuzzle(
     seed: string,
     difficulty: Difficulty,
+    mode: GameMode = 'standard',
   ): { board: ReturnType<typeof emptyBoard>; moves: number } {
     const current = this.data.currentPuzzle;
-    if (!current || current.seed !== seed || current.difficulty !== difficulty) {
+    if (
+      !current ||
+      current.seed !== seed ||
+      current.difficulty !== difficulty ||
+      current.mode !== mode
+    ) {
       return { board: emptyBoard(), moves: 0 };
     }
     return { board: toBoard(current.board), moves: current.moves };
@@ -94,8 +174,9 @@ export class SaveService {
     difficulty: Difficulty,
     board: ReturnType<typeof emptyBoard>,
     moves: number,
+    mode: GameMode = 'standard',
   ): void {
-    this.data.currentPuzzle = { seed, difficulty, board: toBoard(board), moves };
+    this.data.currentPuzzle = { seed, difficulty, mode, board: toBoard(board), moves };
     this.persist();
   }
 
@@ -103,6 +184,12 @@ export class SaveService {
     this.data.settings = {
       ...this.data.settings,
       ...settings,
+      language: settings.language ? parseLanguage(settings.language) : this.data.settings.language,
+      difficulty:
+        parseDifficulty(settings.difficulty) ??
+        parseDifficulty(this.data.settings.difficulty) ??
+        'gentle',
+      mode: settings.mode ? parseMode(settings.mode) : this.data.settings.mode,
       soundVolume: clampVolume(settings.soundVolume, this.data.settings.soundVolume),
       musicVolume: clampVolume(settings.musicVolume, this.data.settings.musicVolume),
     };
@@ -110,8 +197,25 @@ export class SaveService {
     return this.settings;
   }
 
-  markSolved(): void {
+  completeTutorial(): void {
+    this.data.tutorial.completedVersion = TUTORIAL_VERSION;
+    this.persist();
+  }
+
+  startTimedAttempt(): void {
+    this.data.stats.timed.attempts += 1;
+    this.persist();
+  }
+
+  markSolved(mode: GameMode = 'standard', remainingMs = 0): void {
     this.data.stats.solved += 1;
+    if (mode === 'timed') {
+      this.data.stats.timed.wins += 1;
+      this.data.stats.timed.bestRemainingMs = Math.max(
+        this.data.stats.timed.bestRemainingMs,
+        finiteNonNegative(remainingMs),
+      );
+    }
     delete this.data.currentPuzzle;
     this.persist();
   }

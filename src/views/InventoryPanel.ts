@@ -1,19 +1,20 @@
 import Phaser from 'phaser';
 import { FONT_DISPLAY } from '../game/constants';
+import type { I18nService } from '../i18n/I18nService';
 
 export class InventoryPanel extends Phaser.GameObjects.Container {
   readonly width = 455;
   readonly height = 650;
   private readonly background: Phaser.GameObjects.Graphics;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, i18n: I18nService) {
     super(scene, x, y);
     scene.add.existing(this);
     this.background = scene.add.graphics();
     this.add(this.background);
     this.draw();
     const title = scene.add
-      .text(0, -363, 'BENTO FRIENDS', {
+      .text(0, -363, i18n.t('inventory.title'), {
         fontFamily: FONT_DISPLAY,
         fontSize: '20px',
         fontStyle: 'bold',
@@ -24,7 +25,7 @@ export class InventoryPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     const sub = scene.add
-      .text(0, -334, '3 complete families · 1 stays', {
+      .text(0, -334, i18n.t('inventory.subtitle'), {
         fontFamily: 'Trebuchet MS, sans-serif',
         fontSize: '14px',
         color: '#74584f',

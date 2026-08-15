@@ -25,9 +25,9 @@ describe('puzzle generator and public solver', () => {
   const generator = new PuzzleGenerator();
 
   it('is reproducible per difficulty and its solution satisfies every visible rule', () => {
-    const first = generator.create('BENTO-K7F2-QM91', 'Clever');
-    const second = generator.create('BENTO-K7F2-QM91', 'Clever');
-    const cozy = generator.create('BENTO-K7F2-QM91', 'Cozy');
+    const first = generator.create('BENTO-K7F2-QM91', 'clever');
+    const second = generator.create('BENTO-K7F2-QM91', 'clever');
+    const cozy = generator.create('BENTO-K7F2-QM91', 'cozy');
     expect(first).toEqual(second);
     expect(first).not.toHaveProperty('activeAnimals');
     expect(first.solution).toEqual(cozy.solution);
@@ -43,7 +43,7 @@ describe('puzzle generator and public solver', () => {
     const pieces = createAllPieces();
     const foodOnlyMap: CluePattern = {
       id: 'anchor-map',
-      name: 'food-only map',
+      name: 'cafeMap',
       width: 3,
       height: 3,
       cells: ['egg', 'rice', 'sandwich', 'egg', 'rice', 'sandwich', 'egg', 'rice', 'sandwich'].map(
@@ -58,7 +58,7 @@ describe('puzzle generator and public solver', () => {
   });
 
   it('returns the generated solution from both exact and deduction solvers', () => {
-    const puzzle = generator.create('BENTO-MOON-CAKE', 'Tricky');
+    const puzzle = generator.create('BENTO-MOON-CAKE', 'tricky');
     const exact = solvePuzzle(puzzle, 2);
     const human = solveHumanly(puzzle);
     expect(exact.count).toBe(1);
@@ -69,7 +69,7 @@ describe('puzzle generator and public solver', () => {
   });
 
   it('keeps the reported daily tricky puzzle consistent and uniquely solvable', () => {
-    const puzzle = generator.create('BENTO-D260-814B', 'Tricky');
+    const puzzle = generator.create('BENTO-D260-814B', 'tricky');
     const exact = solvePuzzle(puzzle, 2);
     const human = solveHumanly(puzzle);
 
@@ -81,7 +81,7 @@ describe('puzzle generator and public solver', () => {
   });
 
   it('builds Master puzzles from a partial café map and several substantial sketches', () => {
-    const puzzle = generator.create('BENTO-MASTER-01', 'Master');
+    const puzzle = generator.create('BENTO-MASTER-01', 'master');
     const anchor = puzzle.clues.find((clue) => clue.id === 'anchor-map')!;
     const sketches = puzzle.clues.filter((clue) => clue.id !== 'anchor-map');
 
@@ -102,8 +102,8 @@ describe('puzzle generator and public solver', () => {
   });
 
   it('generates the fourth fixed L orientation as a translation-only sketch', () => {
-    const puzzle = generator.create('BENTO-G00000', 'Gentle');
-    const rightCorner = puzzle.clues.find((clue) => clue.name === 'right corner');
+    const puzzle = generator.create('BENTO-G00000', 'gentle');
+    const rightCorner = puzzle.clues.find((clue) => clue.name === 'rightCorner');
 
     expect(rightCorner).toBeDefined();
     expect(rightCorner!.cells.map((cell) => `${cell.x},${cell.y}`).sort()).toEqual([
@@ -129,9 +129,9 @@ describe('puzzle generator and public solver', () => {
       }
       scores.set(difficulty, totalScore / 100);
     }
-    expect(scores.get('Cozy')!).toBeLessThan(scores.get('Gentle')!);
-    expect(scores.get('Gentle')!).toBeLessThan(scores.get('Clever')!);
-    expect(scores.get('Clever')!).toBeLessThan(scores.get('Tricky')!);
-    expect(scores.get('Tricky')!).toBeLessThan(scores.get('Master')!);
+    expect(scores.get('cozy')!).toBeLessThan(scores.get('gentle')!);
+    expect(scores.get('gentle')!).toBeLessThan(scores.get('clever')!);
+    expect(scores.get('clever')!).toBeLessThan(scores.get('tricky')!);
+    expect(scores.get('tricky')!).toBeLessThan(scores.get('master')!);
   }, 20_000);
 });

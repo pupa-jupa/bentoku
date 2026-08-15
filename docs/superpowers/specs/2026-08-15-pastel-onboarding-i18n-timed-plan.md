@@ -18,4 +18,3 @@
 16. Review desktop and mobile-landscape screenshots in both locales and both modes.
 17. Create a Vercel Preview and perform production-like smoke tests.
 18. Wait for explicit approval before Production Deploy or domain changes.
-

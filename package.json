@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "assets:build": "node scripts/build-runtime-assets.mjs",
     "assets:verify": "node scripts/verify-lossless-webp.mjs",
+    "art:preview": "node scripts/capture-art-preview.mjs",
     "sfx:build": "node scripts/generate-sfx.mjs"
   },
   "dependencies": {
@@ -29,7 +30,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^16.3.0",
     "prettier": "^3.6.2",
-    "sharp": "^0.34.3",
+    "sharp": "^0.35.3",
     "typescript": "^6.0.1",
     "typescript-eslint": "^8.39.1",
     "vite": "8.1.5",

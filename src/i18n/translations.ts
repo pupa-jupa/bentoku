@@ -52,23 +52,12 @@ export const en = {
   'difficulty.tricky.description': 'The deepest deductions, still with no guessing.',
   'difficulty.master.description':
     'A partial café map and more interlocking sketches for the longest logic chains.',
-  'help.title': 'A note from the café',
   'help.body':
     'Choose exactly three complete animal families; one whole family stays on the tray. Each sketch keeps its shape, but can slide around the bento. An animal mark means any food of that animal; a food mark means any animal.',
-  'help.explain': 'Explain',
-  'help.nudge': 'Nudge',
   'help.tutorial': 'Tutorial',
   'help.reveal': 'Reveal one',
   'help.tutorialBody':
     'Replay the guided Cozy lesson. It will lead you through each required action before normal play resumes.',
-  'hint.explain':
-    'Use exactly three complete animal families—egg, rice, and sandwich—so one whole family remains on the tray. Each little sketch can slide anywhere inside the 3 × 3 box while its symbols keep the same relative positions. You have {count} movable {sketches} and one fixed café map.{partial}',
-  'hint.sketch.one': 'sketch',
-  'hint.sketch.other': 'sketches',
-  'hint.partialMap': ' Blank map cells give no information.',
-  'hint.startAnchor': 'Start with the café map: each mark belongs to that exact cell.',
-  'hint.nudge':
-    'Try the {clue} sketch. It has {count} visible marks—test the few places where its whole shape can fit.',
   'clue.littleRow': 'little row',
   'clue.littleColumn': 'little column',
   'clue.longRow': 'long row',
@@ -135,10 +124,9 @@ export const en = {
   'tutorial.replaceBody': 'Select the highlighted friend and return it to the highlighted cell.',
   'tutorial.completeTitle': 'Lesson complete',
   'tutorial.completeBody':
-    'Now finish this Cozy bento at your own pace. You can replay the tutorial from the café note in Help.',
+    'Now finish this Cozy bento at your own pace. You can replay the tutorial from Help.',
   'tutorial.skipTitle': 'Skip the tutorial?',
-  'tutorial.skipBody':
-    'You can replay it later from the café note in Help. The Cozy board will restart empty.',
+  'tutorial.skipBody': 'You can replay it later from Help. The Cozy board will restart empty.',
   'tutorial.wrongCell': 'Try the highlighted cell. This friend has not moved yet.',
   'announce.ready': 'Bentoku ready. Choose a bento friend, then choose a box cell.',
   'announce.nothingToUndo': 'Nothing to undo yet.',
@@ -208,23 +196,12 @@ export const ru: Record<TranslationKey, string> = {
   'difficulty.tricky.description': 'Глубокие рассуждения, но всё ещё без угадывания.',
   'difficulty.master.description':
     'Неполная карта кафе и больше связанных эскизов для самых длинных цепочек.',
-  'help.title': 'Записка из кафе',
   'help.body':
     'Выберите ровно три полные семьи животных; одна семья целиком останется на подносе. Каждый эскиз сохраняет форму, но может сдвигаться внутри бенто. Значок животного допускает любую еду, а значок еды — любое животное.',
-  'help.explain': 'Объяснить',
-  'help.nudge': 'Намекнуть',
   'help.tutorial': 'Обучение',
   'help.reveal': 'Открыть одну',
   'help.tutorialBody':
     'Повторите пошаговый урок на уровне «Уютный». Игра проведёт вас через каждое обязательное действие.',
-  'hint.explain':
-    'Используйте ровно три полные семьи: яйцо, рис и сэндвич. Одна семья целиком останется на подносе. Каждый маленький эскиз может сдвигаться внутри поля 3 × 3, сохраняя взаимное расположение символов. Подвижных эскизов: {count}; также есть одна фиксированная карта кафе.{partial}',
-  'hint.sketch.one': 'эскиз',
-  'hint.sketch.other': 'эскизов',
-  'hint.partialMap': ' Пустые клетки карты не дают информации.',
-  'hint.startAnchor': 'Начните с карты кафе: каждая отметка относится к точной клетке.',
-  'hint.nudge':
-    'Попробуйте эскиз «{clue}». В нём {count} видимых отметок — проверьте места, куда целиком помещается его форма.',
   'clue.littleRow': 'короткий ряд',
   'clue.littleColumn': 'короткий столбец',
   'clue.longRow': 'длинный ряд',
@@ -294,10 +271,9 @@ export const ru: Record<TranslationKey, string> = {
     'Выберите подсвеченного персонажа и снова поместите его в подсвеченную клетку.',
   'tutorial.completeTitle': 'Обучение завершено',
   'tutorial.completeBody':
-    'Теперь закончите это уютное бенто самостоятельно. Повторить обучение можно через записку кафе в разделе помощи.',
+    'Теперь закончите это уютное бенто самостоятельно. Повторить обучение можно в разделе помощи.',
   'tutorial.skipTitle': 'Пропустить обучение?',
-  'tutorial.skipBody':
-    'Его можно повторить позже через записку кафе в разделе помощи. Уютное поле начнётся пустым.',
+  'tutorial.skipBody': 'Его можно повторить позже в разделе помощи. Уютное поле начнётся пустым.',
   'tutorial.wrongCell': 'Попробуйте подсвеченную клетку. Эта фишка пока не перемещена.',
   'announce.ready': 'Bentoku готово. Выберите друга, затем клетку бенто.',
   'announce.nothingToUndo': 'Пока нечего отменять.',

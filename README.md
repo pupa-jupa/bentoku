@@ -8,7 +8,7 @@ Bentoku is a finished client-side browser puzzle about arranging nine tiny kawai
 - Drag a piece directly into the box.
 - Drop one placed piece onto another to swap them.
 - Drop a placed piece back on the tray to return it.
-- On the first visit, complete the guided Cozy tutorial. Each interactive instruction must be performed before the lesson advances; the lesson can later be replayed from the café note in Help.
+- On the first visit, complete or skip the guided Cozy tutorial. Each interactive instruction must be performed before the lesson advances; the lesson can later be replayed from Help.
 - Choose Cozy, Gentle, Clever, Tricky, or Master from the difficulty button. Every level is deduction-only; higher levels use longer chains instead of guesses. Master leaves at least one café-map cell blank and links five or six substantial sliding sketches.
 - Choose English or Russian in settings. English is the default language.
 - Master Rush adds a 1:45 timer to a fresh Master puzzle. Reveal is disabled, and an expired attempt can only be retried or replaced with a new challenge.

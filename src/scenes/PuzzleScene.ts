@@ -102,7 +102,7 @@ export class PuzzleScene extends Phaser.Scene {
     this.settings = this.save.settings;
     this.i18n = new I18nService('en');
     this.localizedI18n = new I18nService(this.settings.language);
-    this.hint = new HintController(this.localizedI18n);
+    this.hint = new HintController();
     document.documentElement.lang = 'en';
     this.game.canvas.setAttribute('aria-label', this.i18n.t('app.ariaLabel'));
     this.audio = new AudioService(this, this.settings);
@@ -707,28 +707,11 @@ export class PuzzleScene extends Phaser.Scene {
     const actions: Array<{
       label: string;
       callback: () => void;
+      primary?: boolean;
       sound?: SoundName | false;
-    }> = [
-      {
-        label: this.localizedI18n.t('help.explain'),
-        callback: () =>
-          this.showMessage(this.localizedI18n.t('help.explain'), this.hint.explain(this.puzzle)),
-        sound: 'note_open',
-      },
-      {
-        label: this.localizedI18n.t('help.nudge'),
-        callback: () =>
-          this.showMessage(this.localizedI18n.t('help.nudge'), this.hint.nudge(this.puzzle)),
-        sound: 'note_open',
-      },
-      {
-        label: this.localizedI18n.t('help.tutorial'),
-        callback: () => this.beginTutorial(),
-        sound: 'note_open',
-      },
-    ];
+    }> = [];
     if (this.mode !== 'timed') {
-      actions.splice(2, 0, {
+      actions.push({
         label: this.localizedI18n.t('help.reveal'),
         callback: () => {
           const index = this.hint.reveal(this.puzzle, this.placement.board);
@@ -741,8 +724,14 @@ export class PuzzleScene extends Phaser.Scene {
         sound: false,
       });
     }
+    actions.push({
+      label: this.localizedI18n.t('help.tutorial'),
+      callback: () => this.beginTutorial(),
+      primary: true,
+      sound: 'note_open',
+    });
     this.openModal(
-      this.localizedI18n.t('help.title'),
+      '',
       `${this.localizedI18n.t('help.body')}\n\n${this.localizedI18n.t('help.tutorialBody')}`,
       actions,
     );
@@ -840,13 +829,10 @@ export class PuzzleScene extends Phaser.Scene {
   private openDifficultySelect(): void {
     if (this.solved || this.tutorial?.active) return;
     this.openModal(
-      this.i18n.t('difficulty.title'),
-      this.i18n.t('difficulty.body'),
+      this.localizedI18n.t('difficulty.title'),
+      this.localizedI18n.t('difficulty.body'),
       DIFFICULTIES.map((difficulty) => ({
-        label:
-          difficulty === this.puzzle.difficulty
-            ? this.i18n.t('difficulty.current', { difficulty: this.difficultyLabel(difficulty) })
-            : this.difficultyLabel(difficulty),
+        label: this.difficultyLabel(difficulty),
         callback: () => this.switchDifficulty(difficulty),
         primary: difficulty === this.puzzle.difficulty,
       })),
@@ -887,22 +873,25 @@ export class PuzzleScene extends Phaser.Scene {
     const card = this.add.graphics();
     const height =
       Math.max(330, 240 + Math.ceil(actions.length / 2) * 62) + (sliders?.length ?? 0) * 88;
+    const hasTitle = titleText.trim().length > 0;
     card.fillStyle(COLORS.shadow, 0.17);
     card.fillRoundedRect(-312, -height / 2 + 12, 640, height, 38);
     card.fillStyle(COLORS.milk, 1);
     card.fillRoundedRect(-320, -height / 2, 640, height, 38);
     card.lineStyle(4, COLORS.blush, 0.45);
     card.strokeRoundedRect(-312, -height / 2 + 8, 624, height - 16, 32);
-    const title = this.add
-      .text(0, -height / 2 + 54, titleText, {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '30px',
-        fontStyle: 'bold',
-        color: '#684a42',
-      })
-      .setOrigin(0.5);
+    const title = hasTitle
+      ? this.add
+          .text(0, -height / 2 + 54, titleText, {
+            fontFamily: FONT_DISPLAY,
+            fontSize: '30px',
+            fontStyle: 'bold',
+            color: '#684a42',
+          })
+          .setOrigin(0.5)
+      : undefined;
     const body = this.add
-      .text(0, -height / 2 + 126, bodyText, {
+      .text(0, -height / 2 + (hasTitle ? 126 : 104), bodyText, {
         fontFamily: FONT_BODY,
         fontSize: '18px',
         color: '#80665f',
@@ -911,7 +900,7 @@ export class PuzzleScene extends Phaser.Scene {
         lineSpacing: 7,
       })
       .setOrigin(0.5);
-    modal.add([shade, card, title, body]);
+    modal.add([shade, card, ...(title ? [title] : []), body]);
     sliders?.forEach((slider, index) => {
       this.makeSlider(modal, -height / 2 + 218 + index * 88, slider);
     });
@@ -1070,13 +1059,6 @@ export class PuzzleScene extends Phaser.Scene {
     parent.add([label, visual, zone]);
   }
 
-  private showMessage(title: string, message: string): void {
-    this.openModal(title, message, [
-      { label: this.localizedI18n.t('button.gotIt'), callback: () => this.closeModal() },
-    ]);
-    this.announce(message);
-  }
-
   private closeModal(): void {
     if (!this.modal) return;
     this.modal.destroy(true);
@@ -1154,7 +1136,6 @@ export class PuzzleScene extends Phaser.Scene {
     this.closeModal();
     this.settings = this.save.updateSettings({ language });
     this.localizedI18n.setLanguage(language);
-    this.hint = new HintController(this.localizedI18n);
     document.documentElement.lang = 'en';
     if (this.tutorial?.active) {
       this.showTutorialStep();

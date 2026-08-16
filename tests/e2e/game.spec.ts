@@ -453,7 +453,9 @@ test('allows Settings during the tutorial and can skip into an empty Cozy game',
     });
 });
 
-test('keeps the main game English while localizing Settings and Help', async ({ page }) => {
+test('localizes Settings, difficulty guidance, and Help without translating level names', async ({
+  page,
+}) => {
   const settingsButton = await screenPoint(page, 1490, 54);
   await page.mouse.click(settingsButton.x, settingsButton.y);
   const languageButton = await screenPoint(page, 665, 701);
@@ -500,11 +502,35 @@ test('keeps the main game English while localizing Settings and Help', async ({ 
     ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
     scene.closeModal();
   });
+
+  const difficultyButton = await screenPoint(page, 1034, 54);
+  await page.mouse.click(difficultyButton.x, difficultyButton.y);
+  const difficultyCopy = await sceneTexts(page);
+  expect(difficultyCopy).toContain('Выберите уровень сложности');
+  expect(difficultyCopy).toContain('Cozy');
+  expect(difficultyCopy).toContain('Gentle');
+  expect(difficultyCopy).toContain('Clever');
+  expect(difficultyCopy).toContain('Tricky');
+  expect(difficultyCopy).toContain('Master');
+  expect(difficultyCopy).not.toContain('Уютный');
+  expect(difficultyCopy).not.toContain('Спокойный');
+  await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState & { closeModal(): void } } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    scene.closeModal();
+  });
+
   const helpButton = await screenPoint(page, 1426, 54);
   await page.mouse.click(helpButton.x, helpButton.y);
   const helpCopy = await sceneTexts(page);
-  expect(helpCopy).toContain('Записка из кафе');
+  expect(helpCopy).not.toContain('Записка из кафе');
+  expect(helpCopy).not.toContain('Объяснить');
+  expect(helpCopy).not.toContain('Намекнуть');
   expect(helpCopy).toContain('Обучение');
+  expect(helpCopy).toContain('Открыть одну');
 });
 
 test('starts Master Rush at 1:45 and removes Reveal from timed help', async ({ page }) => {

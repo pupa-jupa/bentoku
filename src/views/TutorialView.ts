@@ -33,6 +33,7 @@ export class TutorialView {
     private readonly scene: Phaser.Scene,
     private readonly i18n: I18nService,
     private readonly onContinue: () => void,
+    private readonly onSkip: () => void,
   ) {}
 
   show(
@@ -143,6 +144,23 @@ export class TutorialView {
       )
       .setOrigin(0.5);
     container.add([title, body]);
+
+    const skip = this.scene.add
+      .text(
+        cardPosition.x + cardWidth / 2 - 24,
+        cardPosition.y - cardHeight / 2 + 22,
+        this.i18n.t('button.skipTutorial'),
+        {
+          fontFamily: FONT_BODY,
+          fontSize: '15px',
+          fontStyle: 'bold',
+          color: '#a06f78',
+        },
+      )
+      .setOrigin(1, 0.5)
+      .setInteractive({ useHandCursor: true });
+    skip.on('pointerdown', this.onSkip);
+    container.add(skip);
 
     if (showContinue) {
       const button = this.scene.add.container(cardPosition.x, cardPosition.y + cardHeight / 2 - 42);

@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_DISPLAY } from '../game/constants';
 import { I18nService } from '../i18n/I18nService';
-import { SaveService } from '../services/SaveService';
 import {
   clueAssets,
   environmentAssets,
@@ -16,7 +15,7 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   preload(): void {
-    const i18n = new I18nService(new SaveService().settings.language);
+    const i18n = new I18nService('en');
     const title = this.add
       .text(800, 380, i18n.t('preload.packing'), {
         fontFamily: FONT_DISPLAY,

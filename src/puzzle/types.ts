@@ -109,6 +109,7 @@ export interface PuzzleDefinition {
 
 export interface PlayerSettings {
   language: Language;
+  audioDefaultsVersion: number;
   sound: boolean;
   soundVolume: number;
   musicVolume: number;

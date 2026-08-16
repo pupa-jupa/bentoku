@@ -66,6 +66,7 @@ export class PuzzleScene extends Phaser.Scene {
   private audio!: AudioService;
   private music!: MusicService;
   private i18n!: I18nService;
+  private localizedI18n!: I18nService;
   private settings!: PlayerSettings;
   private puzzle!: PuzzleDefinition;
   private puzzleController!: PuzzleController;
@@ -99,9 +100,10 @@ export class PuzzleScene extends Phaser.Scene {
   create(): void {
     this.save = new SaveService();
     this.settings = this.save.settings;
-    this.i18n = new I18nService(this.settings.language);
-    this.hint = new HintController(this.i18n);
-    document.documentElement.lang = this.settings.language;
+    this.i18n = new I18nService('en');
+    this.localizedI18n = new I18nService(this.settings.language);
+    this.hint = new HintController(this.localizedI18n);
+    document.documentElement.lang = 'en';
     this.game.canvas.setAttribute('aria-label', this.i18n.t('app.ariaLabel'));
     this.audio = new AudioService(this, this.settings);
     this.music = new MusicService(this, musicAssets, this.settings.musicVolume);
@@ -286,6 +288,7 @@ export class PuzzleScene extends Phaser.Scene {
       callback: () => this.openSettings(),
       icon: true,
       sound: false,
+      allowDuringTutorial: true,
     });
 
     this.moveText = this.add
@@ -413,8 +416,13 @@ export class PuzzleScene extends Phaser.Scene {
       }
       const slot = this.bento.nearestSlot(target.x, target.y);
       this.bento.slots.forEach((item) => item.setHighlighted(false));
-      if (slot !== null) this.placeSelected(slot);
-      else if (this.inventory.containsWorldPoint(target.x, target.y) && target.boardCell !== null) {
+      if (slot !== null) {
+        const placed = this.placeSelected(slot);
+        if (!placed) target.returnHome(this.settings.reducedMotion);
+      } else if (
+        this.inventory.containsWorldPoint(target.x, target.y) &&
+        target.boardCell !== null
+      ) {
         this.placement.returnToTray(target.piece.id);
         this.audio.play('piece_return');
         this.afterBoardChange();
@@ -457,8 +465,13 @@ export class PuzzleScene extends Phaser.Scene {
     if (pieceId) this.selectPiece(pieceId);
   }
 
-  private placeSelected(index: number): void {
-    if (!this.selectedPiece) return;
+  private placeSelected(index: number): boolean {
+    if (!this.selectedPiece) return false;
+    if (this.tutorial?.active && !this.tutorial.allowsCell(index)) {
+      this.audio.play('ui_tap');
+      this.announce(this.localizedI18n.t('tutorial.wrongCell'));
+      return false;
+    }
     const placedPiece = this.selectedPiece;
     const result = this.placement.place(placedPiece, index);
     if (result.changed) {
@@ -468,8 +481,11 @@ export class PuzzleScene extends Phaser.Scene {
         this.showTutorialStep();
       }
     }
-    this.selectedPiece = null;
-    this.pieces.forEach((view) => view.setSelected(false));
+    if (result.changed) {
+      this.selectedPiece = null;
+      this.pieces.forEach((view) => view.setSelected(false));
+    }
+    return result.changed;
   }
 
   private afterBoardChange(): void {
@@ -694,25 +710,26 @@ export class PuzzleScene extends Phaser.Scene {
       sound?: SoundName | false;
     }> = [
       {
-        label: this.i18n.t('help.explain'),
+        label: this.localizedI18n.t('help.explain'),
         callback: () =>
-          this.showMessage(this.i18n.t('help.explain'), this.hint.explain(this.puzzle)),
+          this.showMessage(this.localizedI18n.t('help.explain'), this.hint.explain(this.puzzle)),
         sound: 'note_open',
       },
       {
-        label: this.i18n.t('help.nudge'),
-        callback: () => this.showMessage(this.i18n.t('help.nudge'), this.hint.nudge(this.puzzle)),
+        label: this.localizedI18n.t('help.nudge'),
+        callback: () =>
+          this.showMessage(this.localizedI18n.t('help.nudge'), this.hint.nudge(this.puzzle)),
         sound: 'note_open',
       },
       {
-        label: this.i18n.t('help.tutorial'),
+        label: this.localizedI18n.t('help.tutorial'),
         callback: () => this.beginTutorial(),
         sound: 'note_open',
       },
     ];
     if (this.mode !== 'timed') {
       actions.splice(2, 0, {
-        label: this.i18n.t('help.reveal'),
+        label: this.localizedI18n.t('help.reveal'),
         callback: () => {
           const index = this.hint.reveal(this.puzzle, this.placement.board);
           this.closeModal();
@@ -725,46 +742,60 @@ export class PuzzleScene extends Phaser.Scene {
       });
     }
     this.openModal(
-      this.i18n.t('help.title'),
-      `${this.i18n.t('help.body')}\n\n${this.i18n.t('help.tutorialBody')}`,
+      this.localizedI18n.t('help.title'),
+      `${this.localizedI18n.t('help.body')}\n\n${this.localizedI18n.t('help.tutorialBody')}`,
       actions,
     );
     this.audio.play('note_open');
   }
 
   private openSettings(withSound = true): void {
-    if (this.solved || this.tutorial?.active) return;
-    this.openModal(
-      this.i18n.t('settings.title'),
-      this.i18n.t('settings.body'),
-      [
-        {
-          label: this.i18n.t('settings.effects', {
-            state: this.i18n.t(this.settings.sound ? 'settings.on' : 'settings.off'),
-          }),
-          callback: () => {
-            this.settings = this.save.updateSettings({ sound: !this.settings.sound });
-            this.audio.setEnabled(this.settings.sound);
-            this.closeModal();
-            this.openSettings(false);
-          },
+    if (this.solved) return;
+    const actions: Array<{
+      label: string;
+      callback: () => void;
+      sound?: SoundName | false;
+    }> = [
+      {
+        label: this.localizedI18n.t('settings.effects', {
+          state: this.localizedI18n.t(this.settings.sound ? 'settings.on' : 'settings.off'),
+        }),
+        callback: () => {
+          this.settings = this.save.updateSettings({ sound: !this.settings.sound });
+          this.audio.setEnabled(this.settings.sound);
+          this.closeModal();
+          this.openSettings(false);
         },
-        {
-          label: this.i18n.t('settings.motion', {
-            state: this.i18n.t(
-              this.settings.reducedMotion ? 'settings.motionReduced' : 'settings.motionGentle',
-            ),
-          }),
-          callback: () => {
-            this.settings = this.save.updateSettings({
-              reducedMotion: !this.settings.reducedMotion,
-            });
-            this.closeModal();
-            this.openSettings(false);
-          },
+      },
+      {
+        label: this.localizedI18n.t('settings.motion', {
+          state: this.localizedI18n.t(
+            this.settings.reducedMotion ? 'settings.motionReduced' : 'settings.motionGentle',
+          ),
+        }),
+        callback: () => {
+          this.settings = this.save.updateSettings({
+            reducedMotion: !this.settings.reducedMotion,
+          });
+          this.closeModal();
+          this.openSettings(false);
         },
+      },
+      {
+        label: this.localizedI18n.t('settings.language', {
+          language: this.localizedI18n.t(
+            this.settings.language === 'en' ? 'language.en' : 'language.ru',
+          ),
+        }),
+        callback: () => this.switchLanguage(this.settings.language === 'en' ? 'ru' : 'en'),
+      },
+    ];
+    if (!this.tutorial?.active) {
+      actions.splice(
+        2,
+        0,
         {
-          label: this.i18n.t('settings.restart'),
+          label: this.localizedI18n.t('settings.restart'),
           callback: () => {
             this.closeModal();
             this.placement.restart();
@@ -774,17 +805,19 @@ export class PuzzleScene extends Phaser.Scene {
           },
           sound: 'piece_return',
         },
-        { label: this.i18n.t('settings.random'), callback: () => this.startRandom() },
         {
-          label: this.i18n.t('settings.language', {
-            language: this.i18n.t(this.settings.language === 'en' ? 'language.en' : 'language.ru'),
-          }),
-          callback: () => this.switchLanguage(this.settings.language === 'en' ? 'ru' : 'en'),
+          label: this.localizedI18n.t('settings.random'),
+          callback: () => this.startRandom(),
         },
-      ],
+      );
+    }
+    this.openModal(
+      this.localizedI18n.t('settings.title'),
+      this.localizedI18n.t('settings.body'),
+      actions,
       [
         {
-          label: this.i18n.t('settings.effectsVolume'),
+          label: this.localizedI18n.t('settings.effectsVolume'),
           value: this.settings.soundVolume,
           onChange: (soundVolume) => {
             this.settings = this.save.updateSettings({ soundVolume });
@@ -792,7 +825,7 @@ export class PuzzleScene extends Phaser.Scene {
           },
         },
         {
-          label: this.i18n.t('settings.music'),
+          label: this.localizedI18n.t('settings.music'),
           value: this.settings.musicVolume,
           onChange: (musicVolume) => {
             this.settings = this.save.updateSettings({ musicVolume });
@@ -849,7 +882,7 @@ export class PuzzleScene extends Phaser.Scene {
     dismissible = true,
   ): void {
     this.closeModal();
-    const modal = this.add.container(800, 450).setDepth(2600);
+    const modal = this.add.container(800, 450).setDepth(this.tutorial?.active ? 5000 : 2600);
     const shade = this.add.rectangle(0, 0, 1600, 900, COLORS.walnut, 0.26).setInteractive();
     const card = this.add.graphics();
     const height =
@@ -897,6 +930,7 @@ export class PuzzleScene extends Phaser.Scene {
           callback: action.callback,
           primary: action.primary ?? (index === actions.length - 1 && actions.length > 1),
           sound: action.sound,
+          allowDuringTutorial: true,
         },
         modal,
       );
@@ -1006,7 +1040,7 @@ export class PuzzleScene extends Phaser.Scene {
     const redraw = (): void => {
       label.setText(
         value === 0
-          ? `${spec.label}: ${this.i18n.t('settings.off')}`
+          ? `${spec.label}: ${this.localizedI18n.t('settings.off')}`
           : `${spec.label}: ${Math.round(value * 100)}%`,
       );
       visual.clear();
@@ -1038,7 +1072,7 @@ export class PuzzleScene extends Phaser.Scene {
 
   private showMessage(title: string, message: string): void {
     this.openModal(title, message, [
-      { label: this.i18n.t('button.gotIt'), callback: () => this.closeModal() },
+      { label: this.localizedI18n.t('button.gotIt'), callback: () => this.closeModal() },
     ]);
     this.announce(message);
   }
@@ -1104,10 +1138,10 @@ export class PuzzleScene extends Phaser.Scene {
     return this.i18n.t(`difficulty.${difficulty}.description` as TranslationKey);
   }
 
-  private pieceLabel(pieceId: PieceId): string {
+  private pieceLabel(pieceId: PieceId, i18n = this.i18n): string {
     const piece =
       this.pieces.get(pieceId)?.piece ?? this.puzzle.pieces.find((item) => item.id === pieceId)!;
-    return `${this.i18n.t(`animal.${piece.animal}` as TranslationKey)} · ${this.i18n.t(`food.${piece.food}` as TranslationKey)}`;
+    return `${i18n.t(`animal.${piece.animal}` as TranslationKey)} · ${i18n.t(`food.${piece.food}` as TranslationKey)}`;
   }
 
   private canPlay(): boolean {
@@ -1119,16 +1153,13 @@ export class PuzzleScene extends Phaser.Scene {
   private switchLanguage(language: PlayerSettings['language']): void {
     this.closeModal();
     this.settings = this.save.updateSettings({ language });
-    this.i18n.setLanguage(language);
-    document.documentElement.lang = language;
-    this.game.canvas.setAttribute('aria-label', this.i18n.t('app.ariaLabel'));
-    this.renderScene();
+    this.localizedI18n.setLanguage(language);
+    this.hint = new HintController(this.localizedI18n);
+    document.documentElement.lang = 'en';
     if (this.tutorial?.active) {
-      this.tutorialView = new TutorialView(this, this.i18n, () => this.continueTutorial());
       this.showTutorialStep();
-    } else {
-      this.openSettings(false);
     }
+    this.openSettings(false);
   }
 
   private beginTutorial(): void {
@@ -1143,7 +1174,12 @@ export class PuzzleScene extends Phaser.Scene {
     const firstPiece = this.puzzle.solution[0]!;
     const secondPiece = this.puzzle.solution[1]!;
     this.tutorial = new TutorialController(firstPiece, 0, secondPiece, 1);
-    this.tutorialView = new TutorialView(this, this.i18n, () => this.continueTutorial());
+    this.tutorialView = new TutorialView(
+      this,
+      this.localizedI18n,
+      () => this.continueTutorial(),
+      () => this.requestSkipTutorial(),
+    );
     this.showTutorialStep();
   }
 
@@ -1154,7 +1190,7 @@ export class PuzzleScene extends Phaser.Scene {
       this.tutorialView?.destroy();
       this.tutorialView = undefined;
       this.tutorial = undefined;
-      this.announce(this.i18n.t('tutorial.completeBody'));
+      this.announce(this.localizedI18n.t('tutorial.completeBody'));
       return;
     }
     this.showTutorialStep();
@@ -1169,7 +1205,7 @@ export class PuzzleScene extends Phaser.Scene {
     if (step === 'selectFirst') {
       const view = this.pieces.get(this.tutorial.firstPiece)!;
       highlight = { x: view.x, y: view.y, width: 130, height: 130 };
-      pieceLabel = this.pieceLabel(this.tutorial.firstPiece);
+      pieceLabel = this.pieceLabel(this.tutorial.firstPiece, this.localizedI18n);
     }
     if (step === 'placeFirst') {
       const position = this.bento.slotWorldPosition(this.tutorial.firstCell);
@@ -1180,7 +1216,7 @@ export class PuzzleScene extends Phaser.Scene {
     if (step === 'selectSecond' || step === 'reselectSecond') {
       const view = this.pieces.get(this.tutorial.secondPiece)!;
       highlight = { x: view.x, y: view.y, width: 130, height: 130 };
-      pieceLabel = this.pieceLabel(this.tutorial.secondPiece);
+      pieceLabel = this.pieceLabel(this.tutorial.secondPiece, this.localizedI18n);
     }
     if (step === 'placeSecond' || step === 'replaceSecond') {
       const position = this.bento.slotWorldPosition(this.tutorial.secondCell);
@@ -1190,6 +1226,45 @@ export class PuzzleScene extends Phaser.Scene {
       highlight = { x: this.undoButton.x, y: this.undoButton.y, width: 68, height: 62 };
     }
     this.tutorialView?.show(step, highlight, pieceLabel, this.tutorial.canContinue);
+  }
+
+  private requestSkipTutorial(): void {
+    if (!this.tutorial?.active) return;
+    this.openModal(
+      this.localizedI18n.t('tutorial.skipTitle'),
+      this.localizedI18n.t('tutorial.skipBody'),
+      [
+        {
+          label: this.localizedI18n.t('button.keepLearning'),
+          callback: () => this.closeModal(),
+        },
+        {
+          label: this.localizedI18n.t('button.skipTutorial'),
+          callback: () => this.skipTutorial(),
+          primary: true,
+        },
+      ],
+      undefined,
+      false,
+    );
+  }
+
+  private skipTutorial(): void {
+    if (!this.tutorial?.active) return;
+    const announcement = this.localizedI18n.t('tutorial.skipBody');
+    this.closeModal();
+    this.tutorial.skip();
+    this.save.completeTutorial();
+    this.tutorialView?.destroy();
+    this.tutorialView = undefined;
+    this.tutorial = undefined;
+    this.placement = new PlacementController(emptyBoard(), 0);
+    this.selectedPiece = null;
+    this.pieces.forEach((view) => view.setSelected(false));
+    this.updatePiecePositions(false);
+    this.updateStatus();
+    this.saveCurrent();
+    this.announce(announcement);
   }
 
   private openTimedChallengeRules(useNewSeed = true): void {

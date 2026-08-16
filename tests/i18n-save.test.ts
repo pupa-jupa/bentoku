@@ -29,9 +29,23 @@ describe('localization and save migration', () => {
 
   it('uses English by default and persists an explicit Russian choice', () => {
     const first = new SaveService();
-    expect(first.settings.language).toBe('en');
+    expect(first.settings).toMatchObject({ language: 'en', musicVolume: 0.5 });
     first.updateSettings({ language: 'ru' });
     expect(new SaveService().settings.language).toBe('ru');
+  });
+
+  it('migrates the previous music default to 50% only once', () => {
+    storage.setItem(
+      'bentoku.save.v2',
+      JSON.stringify({
+        version: 2,
+        settings: { language: 'en', difficulty: 'gentle', musicVolume: 1 },
+      }),
+    );
+    const migrated = new SaveService();
+    expect(migrated.settings).toMatchObject({ musicVolume: 0.5, audioDefaultsVersion: 1 });
+    migrated.updateSettings({ musicVolume: 0.8 });
+    expect(new SaveService().settings.musicVolume).toBe(0.8);
   });
 
   it('migrates legacy display-value difficulties to neutral IDs', () => {

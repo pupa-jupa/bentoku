@@ -37,4 +37,14 @@ describe('TutorialController', () => {
     actions.forEach((action) => expect(tutorial.handle(action)).toBe(true));
     expect(tutorial.active).toBe(false);
   });
+
+  it('can be skipped from any active step', () => {
+    const tutorial = new TutorialController('pig_sandwich', 0, 'bear_rice', 1);
+    tutorial.handle({ type: 'continue' });
+    tutorial.handle({ type: 'continue' });
+    expect(tutorial.step).toBe('selectFirst');
+    tutorial.skip();
+    expect(tutorial.active).toBe(false);
+    expect(tutorial.handle({ type: 'selectPiece', pieceId: 'pig_sandwich' })).toBe(false);
+  });
 });

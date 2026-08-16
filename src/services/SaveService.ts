@@ -12,7 +12,8 @@ import {
 const STORAGE_KEY = 'bentoku.save.v2';
 const LEGACY_STORAGE_KEY = 'bentoku.save.v1';
 const DEFAULT_SOUND_VOLUME = 1;
-const DEFAULT_MUSIC_VOLUME = 0.35;
+const DEFAULT_MUSIC_VOLUME = 0.5;
+const AUDIO_DEFAULTS_VERSION = 1;
 export const TUTORIAL_VERSION = 1;
 
 const clampVolume = (value: unknown, fallback: number): number =>
@@ -27,6 +28,7 @@ const defaults = (): SaveData => ({
   version: 2,
   settings: {
     language: 'en',
+    audioDefaultsVersion: AUDIO_DEFAULTS_VERSION,
     sound: true,
     soundVolume: DEFAULT_SOUND_VOLUME,
     musicVolume: DEFAULT_MUSIC_VOLUME,
@@ -52,6 +54,7 @@ export class SaveService {
 
   constructor() {
     this.data = this.load();
+    this.persist();
   }
 
   private load(): SaveData {
@@ -83,12 +86,16 @@ export class SaveService {
         version: 2,
         settings: {
           language: parseLanguage(settings.language),
+          audioDefaultsVersion: AUDIO_DEFAULTS_VERSION,
           sound: typeof settings.sound === 'boolean' ? settings.sound : fallback.settings.sound,
           soundVolume: clampVolume(settings.soundVolume, DEFAULT_SOUND_VOLUME),
-          musicVolume: clampVolume(
-            settings.musicVolume,
-            settings.sound === false ? 0 : DEFAULT_MUSIC_VOLUME,
-          ),
+          musicVolume:
+            finiteNonNegative(settings.audioDefaultsVersion) >= AUDIO_DEFAULTS_VERSION
+              ? clampVolume(
+                  settings.musicVolume,
+                  settings.sound === false ? 0 : DEFAULT_MUSIC_VOLUME,
+                )
+              : DEFAULT_MUSIC_VOLUME,
           reducedMotion:
             typeof settings.reducedMotion === 'boolean'
               ? settings.reducedMotion

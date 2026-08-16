@@ -126,7 +126,7 @@ test('loads only WebP artwork without console errors', async ({ page }) => {
         }
       ).__BENTOKU_GAME__.scene.getScene('PuzzleScene').settings.musicVolume,
   );
-  expect(defaultMusicVolume).toBe(0.35);
+  expect(defaultMusicVolume).toBe(0.5);
 });
 
 test('supports drag, undo, tap placement, and a complete winning run', async ({ page }) => {
@@ -248,7 +248,7 @@ test('lets the player switch deduction difficulty and preserves the choice', asy
     .toBe('master');
 });
 
-test('requires the complete first-visit tutorial and never offers a skip action', async ({
+test('keeps invalid tutorial placements recoverable and completes the guided path', async ({
   page,
 }) => {
   await page.evaluate(() => localStorage.clear());
@@ -268,7 +268,7 @@ test('requires the complete first-visit tutorial and never offers a skip action'
     .toBe('welcome');
 
   const visibleCopy = await sceneTexts(page);
-  expect(visibleCopy.some((text) => /skip/i.test(text))).toBe(false);
+  expect(visibleCopy).toContain('Skip tutorial');
   expect(visibleCopy).toContain('Take the tutorial');
 
   for (const point of [
@@ -312,6 +312,37 @@ test('requires the complete first-visit tutorial and never offers a skip action'
 
   const firstPiece = await screenPoint(page, tutorial.firstPoint.x, tutorial.firstPoint.y);
   await page.mouse.click(firstPiece.x, firstPiece.y);
+  const wrongSlotIndex = tutorial.firstCell === 8 ? 7 : tutorial.firstCell + 1;
+  const wrongSlotPosition = await page.evaluate((index) => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    return scene.bento.slotWorldPosition(index);
+  }, wrongSlotIndex);
+  const wrongSlot = await screenPoint(page, wrongSlotPosition.x, wrongSlotPosition.y);
+  await page.mouse.click(wrongSlot.x, wrongSlot.y);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (
+          window as unknown as {
+            __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+          }
+        ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+        return {
+          step: scene.tutorial?.step,
+          selectedPiece: scene.selectedPiece,
+          board: scene.placement.board,
+        };
+      }),
+    )
+    .toEqual({
+      step: 'placeFirst',
+      selectedPiece: tutorial.firstPiece,
+      board: Array(9).fill(null),
+    });
   const firstSlot = await screenPoint(page, tutorial.firstSlot.x, tutorial.firstSlot.y);
   await page.mouse.click(firstSlot.x, firstSlot.y);
 
@@ -361,7 +392,68 @@ test('requires the complete first-visit tutorial and never offers a skip action'
     .toEqual({ tutorialActive: false, completedVersion: 1 });
 });
 
-test('switches the complete interface to Russian and persists the language', async ({ page }) => {
+test('allows Settings during the tutorial and can skip into an empty Cozy game', async ({
+  page,
+}) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.goto('/');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+            }
+          ).__BENTOKU_GAME__.scene.getScene('PuzzleScene').tutorial?.step,
+      ),
+    )
+    .toBe('welcome');
+
+  const settingsButton = await screenPoint(page, 1490, 54);
+  await page.mouse.click(settingsButton.x, settingsButton.y);
+  await expect.poll(() => sceneTexts(page)).toContain('Cozy settings');
+  await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState & { closeModal(): void } } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    scene.closeModal();
+  });
+
+  const skip = await screenPoint(page, 990, 359);
+  await page.mouse.click(skip.x, skip.y);
+  await expect.poll(() => sceneTexts(page)).toContain('Skip the tutorial?');
+  const confirmSkip = await screenPoint(page, 935, 527);
+  await page.mouse.click(confirmSkip.x, confirmSkip.y);
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (
+          window as unknown as {
+            __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+          }
+        ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+        return {
+          tutorial: Boolean(scene.tutorial),
+          difficulty: scene.puzzle.difficulty,
+          board: scene.placement.board,
+          completedVersion: JSON.parse(localStorage.getItem('bentoku.save.v2') ?? '{}').tutorial
+            ?.completedVersion,
+        };
+      }),
+    )
+    .toEqual({
+      tutorial: false,
+      difficulty: 'cozy',
+      board: Array(9).fill(null),
+      completedVersion: 1,
+    });
+});
+
+test('keeps the main game English while localizing Settings and Help', async ({ page }) => {
   const settingsButton = await screenPoint(page, 1490, 54);
   await page.mouse.click(settingsButton.x, settingsButton.y);
   const languageButton = await screenPoint(page, 665, 701);
@@ -391,11 +483,28 @@ test('switches the complete interface to Russian and persists the language', asy
       }),
     )
     .toEqual({
-      documentLanguage: 'ru',
+      documentLanguage: 'en',
       sceneLanguage: 'ru',
       savedLanguage: 'ru',
       hasRussianTitle: true,
     });
+
+  const mainAndSettingsCopy = await sceneTexts(page);
+  expect(mainAndSettingsCopy).toContain('BENTO FRIENDS');
+  expect(mainAndSettingsCopy).not.toContain('ДРУЗЬЯ БЕНТО');
+  await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState & { closeModal(): void } } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    scene.closeModal();
+  });
+  const helpButton = await screenPoint(page, 1426, 54);
+  await page.mouse.click(helpButton.x, helpButton.y);
+  const helpCopy = await sceneTexts(page);
+  expect(helpCopy).toContain('Записка из кафе');
+  expect(helpCopy).toContain('Обучение');
 });
 
 test('starts Master Rush at 1:45 and removes Reveal from timed help', async ({ page }) => {

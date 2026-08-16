@@ -77,6 +77,10 @@ export class TutorialController {
     return !this.activeValue || this.step === 'undo';
   }
 
+  skip(): void {
+    this.activeValue = false;
+  }
+
   handle(action: TutorialAction): boolean {
     if (!this.activeValue) return false;
     const matches =

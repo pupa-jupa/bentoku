@@ -120,18 +120,18 @@ export class PieceView extends Phaser.GameObjects.Container {
 }
 
 const VISUAL_LAYOUT: Record<BentoPiece['id'], { size: number; x: number; y: number }> = {
-  bear_egg: { size: 187, x: -4, y: -8 },
-  bear_rice: { size: 199, x: -4, y: -10 },
-  bear_sandwich: { size: 206, x: -4, y: -7 },
-  bunny_egg: { size: 192, x: -4, y: -6 },
-  bunny_rice: { size: 175, x: -4, y: -7 },
-  bunny_sandwich: { size: 203, x: -4, y: -7 },
-  cat_egg: { size: 200, x: -4, y: -7 },
-  cat_rice: { size: 199, x: -4, y: -5 },
-  cat_sandwich: { size: 204, x: -4, y: -6 },
-  pig_egg: { size: 202, x: -4, y: -8 },
-  pig_rice: { size: 202, x: -4, y: -7 },
-  pig_sandwich: { size: 209, x: -4, y: -11 },
+  bear_egg: { size: 187, x: 0, y: -1 },
+  bear_rice: { size: 199, x: 0, y: -3 },
+  bear_sandwich: { size: 206, x: 0, y: 0 },
+  bunny_egg: { size: 192, x: 0, y: 1.5 },
+  bunny_rice: { size: 175, x: 0, y: 0 },
+  bunny_sandwich: { size: 203, x: 0, y: 0 },
+  cat_egg: { size: 200, x: 0, y: 0 },
+  cat_rice: { size: 199, x: 0, y: 2.5 },
+  cat_sandwich: { size: 204, x: 0, y: 1.5 },
+  pig_egg: { size: 202, x: 0, y: -1 },
+  pig_rice: { size: 202, x: 0, y: 0 },
+  pig_sandwich: { size: 209, x: 0, y: -4 },
 };
 
 export const getPieceVisualLayout = (

@@ -20,6 +20,8 @@ export const en = {
   'button.startChallenge': 'Start challenge',
   'button.takeTutorial': 'Take the tutorial',
   'button.tutorialAgain': 'Take the tutorial again',
+  'button.skipTutorial': 'Skip tutorial',
+  'button.keepLearning': 'Keep learning',
   'settings.title': 'Cozy settings',
   'settings.body': 'Tune the room to feel just right.',
   'settings.effects': 'Effects: {state}',
@@ -134,6 +136,10 @@ export const en = {
   'tutorial.completeTitle': 'Lesson complete',
   'tutorial.completeBody':
     'Now finish this Cozy bento at your own pace. You can replay the tutorial from the café note in Help.',
+  'tutorial.skipTitle': 'Skip the tutorial?',
+  'tutorial.skipBody':
+    'You can replay it later from the café note in Help. The Cozy board will restart empty.',
+  'tutorial.wrongCell': 'Try the highlighted cell. This friend has not moved yet.',
   'announce.ready': 'Bentoku ready. Choose a bento friend, then choose a box cell.',
   'announce.nothingToUndo': 'Nothing to undo yet.',
   'announce.undo': 'Last move tucked back onto the tray.',
@@ -170,6 +176,8 @@ export const ru: Record<TranslationKey, string> = {
   'button.startChallenge': 'Начать испытание',
   'button.takeTutorial': 'Пройти обучение',
   'button.tutorialAgain': 'Пройти обучение ещё раз',
+  'button.skipTutorial': 'Пропустить обучение',
+  'button.keepLearning': 'Продолжить обучение',
   'settings.title': 'Уютные настройки',
   'settings.body': 'Настройте атмосферу по своему вкусу.',
   'settings.effects': 'Эффекты: {state}',
@@ -287,6 +295,10 @@ export const ru: Record<TranslationKey, string> = {
   'tutorial.completeTitle': 'Обучение завершено',
   'tutorial.completeBody':
     'Теперь закончите это уютное бенто самостоятельно. Повторить обучение можно через записку кафе в разделе помощи.',
+  'tutorial.skipTitle': 'Пропустить обучение?',
+  'tutorial.skipBody':
+    'Его можно повторить позже через записку кафе в разделе помощи. Уютное поле начнётся пустым.',
+  'tutorial.wrongCell': 'Попробуйте подсвеченную клетку. Эта фишка пока не перемещена.',
   'announce.ready': 'Bentoku готово. Выберите друга, затем клетку бенто.',
   'announce.nothingToUndo': 'Пока нечего отменять.',
   'announce.undo': 'Последний ход отменён.',

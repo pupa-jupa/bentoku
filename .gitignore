@@ -12,3 +12,4 @@ art/generations/
 .env.*
 !.env.example
 .vercel
+.superpowers/

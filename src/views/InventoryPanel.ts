@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { FONT_DISPLAY } from '../game/constants';
+import { TRAY_HOLDER_CENTERS } from '../game/gameplayLayout';
 import type { I18nService } from '../i18n/I18nService';
 
 export class InventoryPanel extends Phaser.GameObjects.Container {
@@ -41,10 +42,9 @@ export class InventoryPanel extends Phaser.GameObjects.Container {
   }
 
   trayPosition(index: number): Phaser.Math.Vector2 {
-    const column = index % 3;
-    const row = Math.floor(index / 3);
-    const rowOffsets = [-240, -87, 63, 207];
-    return new Phaser.Math.Vector2(this.x - 126 + column * 121, this.y + rowOffsets[row]!);
+    const anchor = TRAY_HOLDER_CENTERS[index];
+    if (!anchor) throw new Error(`Missing tray holder for piece index ${index}.`);
+    return new Phaser.Math.Vector2(anchor.x, anchor.y);
   }
 
   containsWorldPoint(x: number, y: number): boolean {

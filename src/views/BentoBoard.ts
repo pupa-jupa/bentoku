@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
+import { BENTO_HOLDER_CENTERS, BENTO_HOLDER_SIZE } from '../game/gameplayLayout';
 import { BentoSlot } from './BentoSlot';
 
 export class BentoBoard extends Phaser.GameObjects.Container {
   readonly slots: BentoSlot[] = [];
-  readonly slotSize = 145;
+  readonly slotSize = BENTO_HOLDER_SIZE;
   private readonly frame: Phaser.GameObjects.Graphics;
   private readonly restingX: number;
 
@@ -15,18 +16,9 @@ export class BentoBoard extends Phaser.GameObjects.Container {
     this.add(this.frame);
     this.drawFrame();
 
-    const columnOffsets = [-160, 5, 170];
-    const rowOffsets = [-185, -3, 186];
     for (let index = 0; index < 9; index += 1) {
-      const column = index % 3;
-      const row = Math.floor(index / 3);
-      const slot = new BentoSlot(
-        scene,
-        index,
-        columnOffsets[column]!,
-        rowOffsets[row]!,
-        this.slotSize,
-      );
+      const anchor = BENTO_HOLDER_CENTERS[index]!;
+      const slot = new BentoSlot(scene, index, anchor.x - x, anchor.y - y, this.slotSize);
       this.add(slot);
       this.slots.push(slot);
     }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS } from '../game/constants';
+import { PLACED_SHELL_SIZE } from '../game/gameplayLayout';
 import type { BentoPiece } from '../puzzle/types';
 
 export class PieceView extends Phaser.GameObjects.Container {
@@ -16,7 +17,10 @@ export class PieceView extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, piece: BentoPiece, x: number, y: number) {
     super(scene, x, y);
     this.piece = piece;
-    this.shell = scene.add.image(0, 0, 'piece_shell').setDisplaySize(158, 158).setVisible(false);
+    this.shell = scene.add
+      .image(0, 0, 'piece_shell')
+      .setDisplaySize(PLACED_SHELL_SIZE, PLACED_SHELL_SIZE)
+      .setVisible(false);
     this.shadow = scene.add.ellipse(3, 35, 84, 28, COLORS.shadow, 0.18);
     // The source canvas intentionally includes generous transparent safety
     // padding. Scale and optically center the whole canvas; never trim it.

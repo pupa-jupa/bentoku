@@ -202,8 +202,8 @@ export class PuzzleScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5);
 
-    this.inventory = new InventoryPanel(this, 285, 465, this.i18n);
-    this.bento = new BentoBoard(this, 790, 429);
+    this.inventory = new InventoryPanel(this, 305, 465, this.i18n);
+    this.bento = new BentoBoard(this, 800, 414);
     // Center the dynamic notes on the illustrated paper, whose visual center
     // sits left of the right-hand layout column.
     new CluePanel(this, 1332, 485, this.puzzle.clues, this.i18n);
@@ -1201,7 +1201,7 @@ export class PuzzleScene extends Phaser.Scene {
     const step = this.tutorial.step;
     let highlight: TutorialHighlight | undefined;
     let pieceLabel = '';
-    if (step === 'inventory') highlight = { x: 285, y: 465, width: 470, height: 690 };
+    if (step === 'inventory') highlight = { x: 305, y: 445, width: 470, height: 650 };
     if (step === 'selectFirst') {
       const view = this.pieces.get(this.tutorial.firstPiece)!;
       highlight = { x: view.x, y: view.y, width: 130, height: 130 };

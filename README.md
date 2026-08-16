@@ -12,7 +12,7 @@ Bentoku is a finished client-side browser puzzle about arranging nine tiny kawai
 - Choose Cozy, Gentle, Clever, Tricky, or Master from the difficulty button. Every level is deduction-only; higher levels use longer chains instead of guesses. Master leaves at least one café-map cell blank and links five or six substantial sliding sketches.
 - Choose English or Russian in settings. English is the default language.
 - Master Rush adds a 1:45 timer to a fresh Master puzzle. Reveal is disabled, and an expired attempt can only be retried or replaced with a new challenge.
-- Set effects and music volume independently in Cozy settings; the Effects switch remains available for quick muting.
+- Set effects and music volume independently in Settings; the Effects switch remains available for quick muting.
 - Click the seed to copy a shareable link. Daily and random bentos work without a backend.
 
 ## Development

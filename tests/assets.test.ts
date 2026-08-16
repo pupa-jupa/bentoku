@@ -31,7 +31,7 @@ const walk = (directory: string): string[] =>
 
 describe('production assets', () => {
   it('registers only WebP images that exist', () => {
-    expect(runtimeAssets).toHaveLength(25);
+    expect(runtimeAssets).toHaveLength(28);
     for (const asset of runtimeAssets) {
       expect(asset.path.endsWith('.webp'), asset.path).toBe(true);
       expect(() => readdirSync(path.dirname(path.join('public', asset.path)))).not.toThrow();

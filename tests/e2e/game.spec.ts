@@ -107,8 +107,8 @@ test('loads only WebP artwork without console errors', async ({ page }) => {
       .filter((name) => /\.(webp|png|jpe?g)(\?|$)/i.test(name)),
   );
   // The favicon may be fetched by the browser process without appearing in
-  // the page resource timeline. Phaser itself preloads exactly 25 images.
-  expect(requests.length).toBe(25);
+  // the page resource timeline. Phaser itself preloads exactly 28 images.
+  expect(requests.length).toBe(28);
   expect(requests.every((name) => name.endsWith('.webp'))).toBe(true);
   expect(errors).toEqual([]);
   const musicRequests = await page.evaluate(() =>
@@ -412,7 +412,7 @@ test('allows Settings during the tutorial and can skip into an empty Cozy game',
 
   const settingsButton = await screenPoint(page, 1490, 54);
   await page.mouse.click(settingsButton.x, settingsButton.y);
-  await expect.poll(() => sceneTexts(page)).toContain('Cozy settings');
+  await expect.poll(() => sceneTexts(page)).toContain('Settings');
   await page.evaluate(() => {
     const scene = (
       window as unknown as {
@@ -479,7 +479,7 @@ test('localizes Settings, difficulty guidance, and Help without translating leve
               ...(object.text ? [object.text] : []),
               ...(object.list?.flatMap(collect) ?? []),
             ];
-            return scene.children.list.flatMap(collect).includes('Уютные настройки');
+            return scene.children.list.flatMap(collect).includes('Настройки');
           })(),
         };
       }),

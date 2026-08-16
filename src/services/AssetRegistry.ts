@@ -20,6 +20,9 @@ export const clueAssets: AssetEntry[] = [
 export const environmentAssets: AssetEntry[] = [
   { key: 'gameplay_plate', path: 'assets/environment/gameplay_plate.webp' },
   { key: 'piece_shell', path: 'assets/ui/piece_shell.webp' },
+  { key: 'top_button_pill', path: 'assets/ui/top_button_pill.webp' },
+  { key: 'top_button_pill_active', path: 'assets/ui/top_button_pill_active.webp' },
+  { key: 'top_button_round', path: 'assets/ui/top_button_round.webp' },
   { key: 'success_stamp', path: 'assets/ui/success_stamp.webp' },
   { key: 'tiny_flower', path: 'assets/ui/tiny_flower.webp' },
   { key: 'tiny_leaf', path: 'assets/ui/tiny_leaf.webp' },

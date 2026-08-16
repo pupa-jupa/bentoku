@@ -675,12 +675,17 @@ export class PuzzleScene extends Phaser.Scene {
     parent?: Phaser.GameObjects.Container,
   ): Phaser.GameObjects.Container {
     const container = this.add.container(spec.x, spec.y);
-    const background = this.add.graphics();
     const height = spec.icon ? 48 : 44;
-    background.fillStyle(spec.primary ? COLORS.coral : COLORS.milk, 0.94);
-    background.fillRoundedRect(-spec.width / 2, -height / 2, spec.width, height, height / 2);
-    background.lineStyle(2, spec.primary ? COLORS.blush : COLORS.sage, 0.3);
-    background.strokeRoundedRect(-spec.width / 2, -height / 2, spec.width, height, height / 2);
+    const textureKey = spec.icon
+      ? 'top_button_round'
+      : spec.primary
+        ? 'top_button_pill_active'
+        : 'top_button_pill';
+    const background = this.textures.exists(textureKey)
+      ? this.add
+          .image(0, 0, textureKey)
+          .setDisplaySize(spec.icon ? 55 : spec.width + 6, spec.icon ? 55 : 54)
+      : this.createButtonFallback(spec, height);
     const text = this.add
       .text(0, spec.icon ? -1 : 0, spec.label, {
         fontFamily: FONT_BODY,
@@ -694,12 +699,28 @@ export class PuzzleScene extends Phaser.Scene {
     container.on('pointerdown', () => {
       if (this.tutorial?.active && !spec.allowDuringTutorial) return;
       if (spec.sound !== false) this.audio.play(spec.sound ?? 'ui_tap');
+      this.tweens.add({
+        targets: container,
+        scale: 0.97,
+        duration: 55,
+        yoyo: true,
+        ease: 'Sine.easeOut',
+      });
       spec.callback();
     });
-    container.on('pointerover', () => container.setScale(1.05));
+    container.on('pointerover', () => container.setScale(1.04));
     container.on('pointerout', () => container.setScale(1));
     parent?.add(container);
     return container;
+  }
+
+  private createButtonFallback(spec: ButtonSpec, height: number): Phaser.GameObjects.Graphics {
+    const background = this.add.graphics();
+    background.fillStyle(spec.primary ? COLORS.coral : COLORS.milk, 0.94);
+    background.fillRoundedRect(-spec.width / 2, -height / 2, spec.width, height, height / 2);
+    background.lineStyle(2, spec.primary ? COLORS.blush : COLORS.sage, 0.3);
+    background.strokeRoundedRect(-spec.width / 2, -height / 2, spec.width, height, height / 2);
+    return background;
   }
 
   private openHelp(): void {

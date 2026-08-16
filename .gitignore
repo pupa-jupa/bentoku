@@ -11,3 +11,4 @@ art/generations/
 .env
 .env.*
 !.env.example
+.vercel

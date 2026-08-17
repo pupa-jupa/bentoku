@@ -120,17 +120,31 @@ export interface PlayerSettings {
 }
 
 export interface SaveData {
-  version: 2;
+  version: 3;
   currentPuzzle?: {
     seed: string;
     difficulty: Difficulty;
     mode: GameMode;
+    source: 'infinite' | 'campaign' | 'rush';
+    campaignOrderId?: import('../campaign/campaignData').CampaignOrderId;
     board: Board;
     moves: number;
   };
   settings: PlayerSettings;
   tutorial: {
     completedVersion: number;
+  };
+  campaign: {
+    completedOrderIds: import('../campaign/campaignData').CampaignOrderId[];
+    currentOrderId: import('../campaign/campaignData').CampaignOrderId;
+  };
+  album: {
+    achievements: string[];
+    viewedStories: string[];
+  };
+  appearance: {
+    background: 'standard';
+    pieces: 'standard';
   };
   stats: {
     solved: number;

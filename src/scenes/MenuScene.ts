@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_BODY, FONT_DISPLAY } from '../game/constants';
+import { INFINITE_PLAY_CONTEXT } from '../game/playContext';
 import { I18nService } from '../i18n/I18nService';
 import type { TranslationKey } from '../i18n/translations';
 import type { PlayerSettings } from '../puzzle/types';
@@ -94,13 +95,13 @@ export class MenuScene extends Phaser.Scene {
         id: 'campaign',
         label: 'menu.campaign',
         expression: 'focused',
-        callback: () => this.openCampaign(),
+        callback: () => this.scene.start('CampaignScene'),
       },
       {
         id: 'infinite',
         label: 'menu.infinite',
         expression: 'delighted',
-        callback: () => this.scene.start('PuzzleScene'),
+        callback: () => this.scene.start('PuzzleScene', { context: INFINITE_PLAY_CONTEXT }),
       },
       {
         id: 'achievements',
@@ -207,15 +208,6 @@ export class MenuScene extends Phaser.Scene {
         ease: 'Sine.easeInOut',
       });
     }
-  }
-
-  private openCampaign(): void {
-    this.openInfoPanel(
-      this.i18n.t('menu.campaignTitle'),
-      this.i18n.t('menu.campaignBody'),
-      this.i18n.t('menu.campaignStatus'),
-      'focused',
-    );
   }
 
   private openAlbum(): void {

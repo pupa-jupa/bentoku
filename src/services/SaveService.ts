@@ -1,3 +1,11 @@
+import {
+  CAMPAIGN_ORDERS,
+  firstIncompleteCampaignOrder,
+  getNextCampaignOrder,
+  isCampaignOrderId,
+  type CampaignOrderId,
+} from '../campaign/campaignData';
+import type { PlayContext } from '../game/playContext';
 import { parseDifficulty } from '../puzzle/DifficultyEvaluator';
 import {
   emptyBoard,
@@ -9,8 +17,9 @@ import {
   type SaveData,
 } from '../puzzle/types';
 
-const STORAGE_KEY = 'bentoku.save.v2';
-const LEGACY_STORAGE_KEY = 'bentoku.save.v1';
+const STORAGE_KEY = 'bentoku.save.v3';
+const VERSION_2_STORAGE_KEY = 'bentoku.save.v2';
+const VERSION_1_STORAGE_KEY = 'bentoku.save.v1';
 const DEFAULT_SOUND_VOLUME = 1;
 const DEFAULT_MUSIC_VOLUME = 0.5;
 const AUDIO_DEFAULTS_VERSION = 1;
@@ -21,11 +30,18 @@ const clampVolume = (value: unknown, fallback: number): number =>
 
 const parseLanguage = (value: unknown): Language => (value === 'ru' ? 'ru' : 'en');
 const parseMode = (value: unknown): GameMode => (value === 'timed' ? 'timed' : 'standard');
+const parseSource = (
+  value: unknown,
+  fallback: 'infinite' | 'rush' = 'infinite',
+): 'infinite' | 'campaign' | 'rush' =>
+  value === 'campaign' || value === 'rush' || value === 'infinite' ? value : fallback;
 const finiteNonNegative = (value: unknown, fallback = 0): number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
+const stringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
 const defaults = (): SaveData => ({
-  version: 2,
+  version: 3,
   settings: {
     language: 'en',
     audioDefaultsVersion: AUDIO_DEFAULTS_VERSION,
@@ -38,6 +54,12 @@ const defaults = (): SaveData => ({
     mode: 'standard',
   },
   tutorial: { completedVersion: 0 },
+  campaign: {
+    completedOrderIds: [],
+    currentOrderId: CAMPAIGN_ORDERS[0]!.id,
+  },
+  album: { achievements: [], viewedStories: [] },
+  appearance: { background: 'standard', pieces: 'standard' },
   stats: {
     solved: 0,
     timed: { attempts: 0, wins: 0, bestRemainingMs: 0 },
@@ -60,30 +82,64 @@ export class SaveService {
   private load(): SaveData {
     const fallback = defaults();
     try {
-      const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+      const raw =
+        localStorage.getItem(STORAGE_KEY) ??
+        localStorage.getItem(VERSION_2_STORAGE_KEY) ??
+        localStorage.getItem(VERSION_1_STORAGE_KEY);
       if (!raw) return fallback;
       const parsed = asRecord(JSON.parse(raw));
       const settings = asRecord(parsed.settings);
       const stats = asRecord(parsed.stats);
       const timed = asRecord(stats.timed);
       const tutorial = asRecord(parsed.tutorial);
+      const campaign = asRecord(parsed.campaign);
+      const album = asRecord(parsed.album);
       const current = asRecord(parsed.currentPuzzle);
       const difficulty = parseDifficulty(String(settings.difficulty ?? '')) ?? 'gentle';
       const currentDifficulty = parseDifficulty(String(current.difficulty ?? ''));
       const currentBoard = Array.isArray(current.board) ? current.board : undefined;
+      const currentMode = parseMode(current.mode);
+      const currentSource = parseSource(
+        current.source,
+        currentMode === 'timed' ? 'rush' : 'infinite',
+      );
+      const currentCampaignOrderId = isCampaignOrderId(current.campaignOrderId)
+        ? current.campaignOrderId
+        : undefined;
       const currentPuzzle =
-        typeof current.seed === 'string' && currentDifficulty && currentBoard?.length === 9
+        typeof current.seed === 'string' &&
+        currentDifficulty &&
+        currentBoard?.length === 9 &&
+        (currentSource !== 'campaign' || currentCampaignOrderId)
           ? {
               seed: current.seed,
               difficulty: currentDifficulty,
-              mode: parseMode(current.mode),
+              mode: currentMode,
+              source: currentSource,
+              ...(currentCampaignOrderId ? { campaignOrderId: currentCampaignOrderId } : {}),
               board: toBoard(currentBoard),
               moves: finiteNonNegative(current.moves),
             }
           : undefined;
 
+      const completedOrderIds = stringArray(campaign.completedOrderIds).filter(isCampaignOrderId);
+      const completedSet = new Set(completedOrderIds);
+      const storedCurrentOrderId = isCampaignOrderId(campaign.currentOrderId)
+        ? campaign.currentOrderId
+        : undefined;
+      const storedIndex = storedCurrentOrderId
+        ? CAMPAIGN_ORDERS.findIndex((order) => order.id === storedCurrentOrderId)
+        : -1;
+      const storedOrderIsUnlocked =
+        storedIndex === 0 ||
+        (storedIndex > 0 && completedSet.has(CAMPAIGN_ORDERS[storedIndex - 1]!.id));
+      const currentOrderId =
+        storedCurrentOrderId && storedOrderIsUnlocked
+          ? storedCurrentOrderId
+          : firstIncompleteCampaignOrder(completedSet).id;
+
       return {
-        version: 2,
+        version: 3,
         settings: {
           language: parseLanguage(settings.language),
           audioDefaultsVersion: AUDIO_DEFAULTS_VERSION,
@@ -109,6 +165,12 @@ export class SaveService {
         tutorial: {
           completedVersion: finiteNonNegative(tutorial.completedVersion),
         },
+        campaign: { completedOrderIds, currentOrderId },
+        album: {
+          achievements: stringArray(album.achievements),
+          viewedStories: stringArray(album.viewedStories),
+        },
+        appearance: { background: 'standard', pieces: 'standard' },
         stats: {
           solved: finiteNonNegative(stats.solved),
           timed: {
@@ -155,21 +217,41 @@ export class SaveService {
     return this.data.currentPuzzle?.mode;
   }
 
+  get currentSource(): 'infinite' | 'campaign' | 'rush' | undefined {
+    return this.data.currentPuzzle?.source;
+  }
+
+  get currentPuzzleCampaignOrderId(): CampaignOrderId | undefined {
+    return this.data.currentPuzzle?.campaignOrderId;
+  }
+
   get tutorialCompleted(): boolean {
     return this.data.tutorial.completedVersion >= TUTORIAL_VERSION;
+  }
+
+  get completedCampaignOrderIds(): readonly CampaignOrderId[] {
+    return [...this.data.campaign.completedOrderIds];
+  }
+
+  get selectedCampaignOrderId(): CampaignOrderId {
+    return this.data.campaign.currentOrderId;
   }
 
   loadPuzzle(
     seed: string,
     difficulty: Difficulty,
     mode: GameMode = 'standard',
+    context?: PlayContext,
   ): { board: ReturnType<typeof emptyBoard>; moves: number } {
     const current = this.data.currentPuzzle;
+    const source = context?.source ?? (mode === 'timed' ? 'rush' : 'infinite');
     if (
       !current ||
       current.seed !== seed ||
       current.difficulty !== difficulty ||
-      current.mode !== mode
+      current.mode !== mode ||
+      current.source !== source ||
+      (source === 'campaign' && current.campaignOrderId !== context?.campaignOrderId)
     ) {
       return { board: emptyBoard(), moves: 0 };
     }
@@ -182,8 +264,20 @@ export class SaveService {
     board: ReturnType<typeof emptyBoard>,
     moves: number,
     mode: GameMode = 'standard',
+    context?: PlayContext,
   ): void {
-    this.data.currentPuzzle = { seed, difficulty, mode, board: toBoard(board), moves };
+    const source = context?.source ?? (mode === 'timed' ? 'rush' : 'infinite');
+    this.data.currentPuzzle = {
+      seed,
+      difficulty,
+      mode,
+      source,
+      ...(source === 'campaign' && context?.campaignOrderId
+        ? { campaignOrderId: context.campaignOrderId }
+        : {}),
+      board: toBoard(board),
+      moves,
+    };
     this.persist();
   }
 
@@ -206,6 +300,23 @@ export class SaveService {
 
   completeTutorial(): void {
     this.data.tutorial.completedVersion = TUTORIAL_VERSION;
+    this.persist();
+  }
+
+  selectCampaignOrder(orderId: CampaignOrderId): void {
+    const completed = new Set(this.data.campaign.completedOrderIds);
+    const index = CAMPAIGN_ORDERS.findIndex((order) => order.id === orderId);
+    if (index > 0 && !completed.has(CAMPAIGN_ORDERS[index - 1]!.id)) return;
+    this.data.campaign.currentOrderId = orderId;
+    this.persist();
+  }
+
+  completeCampaignOrder(orderId: CampaignOrderId): void {
+    if (!this.data.campaign.completedOrderIds.includes(orderId)) {
+      this.data.campaign.completedOrderIds.push(orderId);
+    }
+    this.data.campaign.currentOrderId = getNextCampaignOrder(orderId)?.id ?? orderId;
+    delete this.data.currentPuzzle;
     this.persist();
   }
 

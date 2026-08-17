@@ -30,6 +30,7 @@ describe('localization and save migration', () => {
   it('uses English by default and persists an explicit Russian choice', () => {
     const first = new SaveService();
     expect(first.settings).toMatchObject({ language: 'en', musicVolume: 0.5 });
+    expect(JSON.parse(storage.getItem('bentoku.save.v3') ?? '{}').version).toBe(3);
     first.updateSettings({ language: 'ru' });
     expect(new SaveService().settings.language).toBe('ru');
   });
@@ -78,5 +79,53 @@ describe('localization and save migration', () => {
     expect(i18n.moves(1)).toBe('1 ход');
     expect(i18n.moves(2)).toBe('2 хода');
     expect(i18n.moves(5)).toBe('5 ходов');
+  });
+
+  it('migrates version 2 progress and ignores corrupt campaign IDs', () => {
+    storage.setItem(
+      'bentoku.save.v2',
+      JSON.stringify({
+        version: 2,
+        settings: { language: 'ru', difficulty: 'clever', audioDefaultsVersion: 1 },
+        tutorial: { completedVersion: 1 },
+        currentPuzzle: {
+          seed: 'OLD-INFINITE',
+          difficulty: 'clever',
+          mode: 'standard',
+          board: Array(9).fill(null),
+          moves: 4,
+        },
+        stats: { solved: 7, timed: { attempts: 3, wins: 2, bestRemainingMs: 11_000 } },
+      }),
+    );
+    const migrated = new SaveService();
+    expect(migrated.settings).toMatchObject({ language: 'ru', difficulty: 'clever' });
+    expect(migrated.tutorialCompleted).toBe(true);
+    expect(migrated.solvedCount).toBe(7);
+    expect(migrated.timedStats).toEqual({ attempts: 3, wins: 2, bestRemainingMs: 11_000 });
+    expect(migrated.currentSource).toBe('infinite');
+    expect(migrated.selectedCampaignOrderId).toBe('chapter-1-order-1');
+    expect(migrated.completedCampaignOrderIds).toEqual([]);
+
+    const stored = JSON.parse(storage.getItem('bentoku.save.v3') ?? '{}');
+    stored.campaign = {
+      completedOrderIds: ['chapter-1-order-1', 'not-a-real-order'],
+      currentOrderId: 'also-corrupt',
+    };
+    storage.setItem('bentoku.save.v3', JSON.stringify(stored));
+    const recovered = new SaveService();
+    expect(recovered.completedCampaignOrderIds).toEqual(['chapter-1-order-1']);
+    expect(recovered.selectedCampaignOrderId).toBe('chapter-1-order-2');
+  });
+
+  it('stamps an order and advances campaign progress without unlocking out of sequence', () => {
+    const save = new SaveService();
+    save.selectCampaignOrder('chapter-2-order-1');
+    expect(save.selectedCampaignOrderId).toBe('chapter-1-order-1');
+    save.completeCampaignOrder('chapter-1-order-1');
+    expect(save.completedCampaignOrderIds).toEqual(['chapter-1-order-1']);
+    expect(save.selectedCampaignOrderId).toBe('chapter-1-order-2');
+    save.selectCampaignOrder('chapter-1-order-2');
+    expect(new SaveService().selectedCampaignOrderId).toBe('chapter-1-order-2');
   });
 });

@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
+import { getCampaignOrder } from '../campaign/campaignData';
 import { COLORS, FONT_BODY, FONT_DISPLAY } from '../game/constants';
+import { INFINITE_PLAY_CONTEXT, RUSH_PLAY_CONTEXT, type PlayContext } from '../game/playContext';
 import {
   ChallengeTimer,
   formatChallengeTime,
@@ -108,9 +110,16 @@ export class PuzzleScene extends Phaser.Scene {
   private timedOut = false;
   private countdown?: Phaser.GameObjects.Container;
   private visibilityHandler?: () => void;
+  private playContext: PlayContext = INFINITE_PLAY_CONTEXT;
+  private launchContext?: PlayContext;
+  private pendingCampaignContext?: PlayContext;
 
   constructor() {
     super('PuzzleScene');
+  }
+
+  init(data?: { context?: PlayContext }): void {
+    this.launchContext = data?.context;
   }
 
   create(): void {
@@ -118,7 +127,6 @@ export class PuzzleScene extends Phaser.Scene {
     this.settings = this.save.settings;
     this.i18n = new I18nService('en');
     this.localizedI18n = new I18nService(this.settings.language);
-    this.hint = new HintController();
     document.documentElement.lang = 'en';
     this.game.canvas.setAttribute('aria-label', this.i18n.t('app.ariaLabel'));
     this.audio = new AudioService(this, this.settings);
@@ -126,23 +134,43 @@ export class PuzzleScene extends Phaser.Scene {
     const params = new URLSearchParams(window.location.search);
     const firstVisit = !this.save.tutorialCompleted;
     const requestedMode: GameMode = params.get('mode') === 'timed' ? 'timed' : 'standard';
-    this.mode = firstVisit ? 'standard' : requestedMode;
+    const requestedContext =
+      this.launchContext ?? (requestedMode === 'timed' ? RUSH_PLAY_CONTEXT : INFINITE_PLAY_CONTEXT);
+    if (firstVisit && requestedContext.source === 'campaign') {
+      this.pendingCampaignContext = requestedContext;
+    }
+    this.playContext = firstVisit ? INFINITE_PLAY_CONTEXT : requestedContext;
+    this.mode = this.playContext.timed ? 'timed' : 'standard';
+    const campaignOrder =
+      requestedContext.source === 'campaign' && requestedContext.campaignOrderId
+        ? getCampaignOrder(requestedContext.campaignOrderId)
+        : undefined;
     const difficulty = firstVisit
       ? 'cozy'
-      : this.mode === 'timed'
-        ? 'master'
-        : (parseDifficulty(params.get('difficulty')) ??
-          this.save.currentDifficulty ??
-          this.settings.difficulty);
+      : campaignOrder
+        ? campaignOrder.difficulty
+        : this.mode === 'timed'
+          ? 'master'
+          : (parseDifficulty(params.get('difficulty')) ??
+            (this.save.currentSource === this.playContext.source
+              ? this.save.currentDifficulty
+              : undefined) ??
+            this.settings.difficulty);
     const savedSeed =
-      this.save.currentDifficulty === difficulty ? this.save.currentSeed : undefined;
+      this.save.currentDifficulty === difficulty &&
+      this.save.currentSource === this.playContext.source
+        ? this.save.currentSeed
+        : undefined;
     const seed = firstVisit
       ? TUTORIAL_SEED
-      : (params.get('seed') ?? savedSeed ?? createRandomSeed());
-    this.createPuzzle(seed, difficulty, this.mode);
+      : (campaignOrder?.seed ?? params.get('seed') ?? savedSeed ?? createRandomSeed());
+    this.createPuzzle(seed, difficulty, this.mode, this.playContext);
     this.bindInput();
     if (firstVisit) this.beginTutorial();
-    else if (this.mode === 'timed') this.openTimedChallengeRules(false);
+    else if (this.mode === 'timed') {
+      if (this.playContext.source === 'campaign') this.openCampaignTimedRules();
+      else this.openTimedChallengeRules(false);
+    }
     this.schedulePetalDrift(true);
     this.time.addEvent({
       delay: 5200,
@@ -171,9 +199,15 @@ export class PuzzleScene extends Phaser.Scene {
     seed: string,
     difficulty: Difficulty = this.settings.difficulty,
     mode: GameMode = 'standard',
+    context: PlayContext = mode === 'timed' ? RUSH_PLAY_CONTEXT : INFINITE_PLAY_CONTEXT,
   ): void {
     this.mode = mode;
-    this.settings = this.save.updateSettings({ difficulty, mode });
+    this.playContext = context;
+    this.hint = new HintController(context.allowReveal);
+    this.settings =
+      context.source === 'campaign'
+        ? this.save.settings
+        : this.save.updateSettings({ difficulty, mode });
     this.puzzle = this.generator.create(seed, difficulty);
     this.usablePieceIds = new Set(
       this.puzzle.solution.filter((pieceId): pieceId is PieceId => pieceId !== null),
@@ -182,7 +216,7 @@ export class PuzzleScene extends Phaser.Scene {
     const saved =
       mode === 'timed'
         ? { board: emptyBoard(), moves: 0 }
-        : this.save.loadPuzzle(this.puzzle.seed, this.puzzle.difficulty, mode);
+        : this.save.loadPuzzle(this.puzzle.seed, this.puzzle.difficulty, mode, context);
     const playableBoard = toBoard(
       saved.board.map((pieceId) => (pieceId && this.usablePieceIds.has(pieceId) ? pieceId : null)),
     );
@@ -190,7 +224,10 @@ export class PuzzleScene extends Phaser.Scene {
     this.selectedPiece = null;
     this.solved = false;
     this.timedOut = false;
-    this.timer = mode === 'timed' ? new ChallengeTimer(MASTER_CHALLENGE_DURATION_MS) : undefined;
+    this.timer =
+      mode === 'timed'
+        ? new ChallengeTimer(context.durationMs ?? MASTER_CHALLENGE_DURATION_MS)
+        : undefined;
     this.renderScene();
     this.saveCurrent();
     this.syncUrl();
@@ -246,44 +283,62 @@ export class PuzzleScene extends Phaser.Scene {
     });
 
     this.seedText = this.add
-      .text(790, 54, this.puzzle.seed, {
-        fontFamily: FONT_BODY,
-        fontSize: '17px',
-        fontStyle: 'bold',
-        color: '#74594f',
-        backgroundColor: '#fff8e9aa',
-        padding: { x: 16, y: 9 },
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-    this.seedText.on('pointerdown', () => void this.copySeed());
-    this.seedText.on('pointerover', () => this.seedText.setColor('#c66f69'));
-    this.seedText.on('pointerout', () => this.seedText.setColor('#74594f'));
+      .text(
+        790,
+        54,
+        this.playContext.source === 'campaign' && this.playContext.campaignOrderId
+          ? this.localizedI18n.t('campaign.order', {
+              order: getCampaignOrder(this.playContext.campaignOrderId).order,
+            })
+          : this.puzzle.seed,
+        {
+          fontFamily: FONT_BODY,
+          fontSize: '17px',
+          fontStyle: 'bold',
+          color: '#74594f',
+          backgroundColor: '#fff8e9aa',
+          padding: { x: 16, y: 9 },
+        },
+      )
+      .setOrigin(0.5);
+    if (this.playContext.source !== 'campaign') {
+      this.seedText.setInteractive({ useHandCursor: true });
+      this.seedText.on('pointerdown', () => void this.copySeed());
+      this.seedText.on('pointerover', () => this.seedText.setColor('#c66f69'));
+      this.seedText.on('pointerout', () => this.seedText.setColor('#74594f'));
+    }
 
     this.makeButton({
       x: 1062,
       y: 54,
       width: 92,
-      label: `${this.difficultyLabel(this.puzzle.difficulty)} ▾`,
-      callback: () => this.openDifficultySelect(),
+      label:
+        this.playContext.source === 'campaign'
+          ? this.difficultyLabel(this.puzzle.difficulty)
+          : `${this.difficultyLabel(this.puzzle.difficulty)} ▾`,
+      callback: () => {
+        if (this.playContext.source !== 'campaign') this.openDifficultySelect();
+      },
       sound: false,
     });
 
-    this.makeButton({
-      x: 1166,
-      y: 54,
-      width: 92,
-      label: this.i18n.t('button.daily'),
-      callback: () => this.startDaily(),
-    });
-    this.makeButton({
-      x: 1270,
-      y: 54,
-      width: 92,
-      label: this.i18n.t('button.timed'),
-      callback: () => this.openTimedChallengeRules(),
-      primary: this.mode === 'timed',
-    });
+    if (this.playContext.source !== 'campaign') {
+      this.makeButton({
+        x: 1166,
+        y: 54,
+        width: 92,
+        label: this.i18n.t('button.daily'),
+        callback: () => this.startDaily(),
+      });
+      this.makeButton({
+        x: 1270,
+        y: 54,
+        width: 92,
+        label: this.i18n.t('button.timed'),
+        callback: () => this.openTimedChallengeRules(),
+        primary: this.mode === 'timed',
+      });
+    }
     this.undoButton = this.makeButton({
       x: 1362,
       y: 54,
@@ -591,7 +646,10 @@ export class PuzzleScene extends Phaser.Scene {
     this.solved = true;
     const remainingMs = this.timer?.remainingMs ?? 0;
     this.timer?.pause();
-    this.save.markSolved(this.mode, remainingMs);
+    this.save.markSolved(this.playContext.source === 'rush' ? 'timed' : 'standard', remainingMs);
+    if (this.playContext.source === 'campaign' && this.playContext.campaignOrderId) {
+      this.save.completeCampaignOrder(this.playContext.campaignOrderId);
+    }
     this.audio.play('success', 100);
     this.announce(this.i18n.t('announce.complete'));
     if (!this.settings.reducedMotion) {
@@ -617,13 +675,19 @@ export class PuzzleScene extends Phaser.Scene {
         this.i18n,
         () => {
           this.audio.play('ui_tap');
-          if (this.mode === 'timed') this.startTimedChallenge(createRandomSeed());
+          if (this.playContext.source === 'campaign') this.scene.start('CampaignScene');
+          else if (this.mode === 'timed') this.startTimedChallenge(createRandomSeed());
           else this.startRandom();
         },
         () => void this.copySeed(),
-        this.mode === 'timed'
-          ? this.i18n.t('celebration.timedBody', { time: formatChallengeTime(remainingMs) })
-          : this.i18n.t('celebration.body'),
+        this.playContext.source === 'campaign'
+          ? this.localizedI18n.t('campaign.completeBody')
+          : this.mode === 'timed'
+            ? this.i18n.t('celebration.timedBody', { time: formatChallengeTime(remainingMs) })
+            : this.i18n.t('celebration.body'),
+        this.playContext.source === 'campaign'
+          ? this.localizedI18n.t('campaign.returnBook')
+          : this.i18n.t('celebration.next'),
       );
     });
   }
@@ -760,7 +824,7 @@ export class PuzzleScene extends Phaser.Scene {
       primary?: boolean;
       sound?: SoundName | false;
     }> = [];
-    if (this.mode !== 'timed') {
+    if (this.playContext.allowReveal) {
       actions.push({
         label: this.localizedI18n.t('help.reveal'),
         callback: () => {
@@ -830,9 +894,7 @@ export class PuzzleScene extends Phaser.Scene {
       },
     ];
     if (!this.tutorial?.active) {
-      actions.splice(
-        2,
-        0,
+      const gameplayActions: typeof actions = [
         {
           label: this.localizedI18n.t('settings.restart'),
           callback: () => {
@@ -844,17 +906,26 @@ export class PuzzleScene extends Phaser.Scene {
           },
           sound: 'piece_return',
         },
-        {
+      ];
+      if (this.playContext.source !== 'campaign') {
+        gameplayActions.push({
           label: this.localizedI18n.t('settings.random'),
           callback: () => this.startRandom(),
-        },
-      );
+        });
+      }
+      actions.splice(2, 0, ...gameplayActions);
     }
     actions.push({
-      label: this.localizedI18n.t('settings.backToCafe'),
+      label: this.localizedI18n.t(
+        this.playContext.returnTarget === 'campaign'
+          ? 'settings.backToCampaign'
+          : 'settings.backToCafe',
+      ),
       callback: () => {
         this.closeModal();
-        this.scene.start('MenuScene');
+        this.scene.start(
+          this.playContext.returnTarget === 'campaign' ? 'CampaignScene' : 'MenuScene',
+        );
       },
     });
     this.openModal(
@@ -1160,6 +1231,7 @@ export class PuzzleScene extends Phaser.Scene {
       this.placement.board,
       this.placement.moves,
       this.mode,
+      this.playContext,
     );
   }
 
@@ -1167,6 +1239,9 @@ export class PuzzleScene extends Phaser.Scene {
     const url = new URL(window.location.href);
     url.searchParams.set('seed', this.puzzle.seed);
     url.searchParams.set('difficulty', difficultySlug(this.puzzle.difficulty));
+    if (this.playContext.source === 'campaign' && this.playContext.campaignOrderId) {
+      url.searchParams.set('campaignOrder', this.playContext.campaignOrderId);
+    } else url.searchParams.delete('campaignOrder');
     if (this.mode === 'timed') url.searchParams.set('mode', 'timed');
     else url.searchParams.delete('mode');
     window.history.replaceState({}, '', url);
@@ -1231,6 +1306,7 @@ export class PuzzleScene extends Phaser.Scene {
       this.tutorialView?.destroy();
       this.tutorialView = undefined;
       this.tutorial = undefined;
+      if (this.startPendingCampaign()) return;
       this.announce(this.localizedI18n.t('tutorial.completeBody'));
       return;
     }
@@ -1299,6 +1375,7 @@ export class PuzzleScene extends Phaser.Scene {
     this.tutorialView?.destroy();
     this.tutorialView = undefined;
     this.tutorial = undefined;
+    if (this.startPendingCampaign()) return;
     this.placement = new PlacementController(emptyBoard(), 0);
     this.selectedPiece = null;
     this.pieces.forEach((view) => view.setSelected(false));
@@ -1306,6 +1383,17 @@ export class PuzzleScene extends Phaser.Scene {
     this.updateStatus();
     this.saveCurrent();
     this.announce(announcement);
+  }
+
+  private startPendingCampaign(): boolean {
+    const context = this.pendingCampaignContext;
+    if (!context?.campaignOrderId) return false;
+    this.pendingCampaignContext = undefined;
+    const order = getCampaignOrder(context.campaignOrderId);
+    this.createPuzzle(order.seed, order.difficulty, order.timed ? 'timed' : 'standard', context);
+    if (order.timed) this.openCampaignTimedRules();
+    else this.announce(this.i18n.t('announce.ready'));
+    return true;
   }
 
   private openTimedChallengeRules(useNewSeed = true): void {
@@ -1320,12 +1408,32 @@ export class PuzzleScene extends Phaser.Scene {
     ]);
   }
 
+  private openCampaignTimedRules(): void {
+    if (this.solved || this.tutorial?.active) return;
+    this.openModal(this.i18n.t('timed.title'), this.localizedI18n.t('campaign.timedRules'), [
+      {
+        label: this.localizedI18n.t('button.startChallenge'),
+        callback: () => {
+          this.closeModal();
+          this.startCountdown(() => this.timer?.start());
+        },
+        primary: true,
+      },
+    ]);
+  }
+
   private startTimedChallenge(seed: string): void {
     this.closeModal();
     this.tutorialView?.destroy();
     this.tutorial = undefined;
-    this.createPuzzle(seed, 'master', 'timed');
+    this.createPuzzle(seed, 'master', 'timed', RUSH_PLAY_CONTEXT);
     this.save.startTimedAttempt();
+    this.startCountdown(() => this.timer?.start());
+  }
+
+  private retryCampaignTimedOrder(): void {
+    this.closeModal();
+    this.createPuzzle(this.puzzle.seed, this.puzzle.difficulty, 'timed', this.playContext);
     this.startCountdown(() => this.timer?.start());
   }
 
@@ -1396,20 +1504,32 @@ export class PuzzleScene extends Phaser.Scene {
     if (this.timedOut || this.solved) return;
     this.timedOut = true;
     this.audio.play('board_incorrect');
+    const actions =
+      this.playContext.source === 'campaign'
+        ? [
+            {
+              label: this.localizedI18n.t('button.retry'),
+              callback: () => this.retryCampaignTimedOrder(),
+              primary: true,
+            },
+          ]
+        : [
+            {
+              label: this.i18n.t('button.retry'),
+              callback: () => this.startTimedChallenge(this.puzzle.seed),
+            },
+            {
+              label: this.i18n.t('button.newChallenge'),
+              callback: () => this.startTimedChallenge(createRandomSeed()),
+              primary: true,
+            },
+          ];
     this.openModal(
       this.i18n.t('timed.timeoutTitle'),
-      this.i18n.t('timed.timeoutBody'),
-      [
-        {
-          label: this.i18n.t('button.retry'),
-          callback: () => this.startTimedChallenge(this.puzzle.seed),
-        },
-        {
-          label: this.i18n.t('button.newChallenge'),
-          callback: () => this.startTimedChallenge(createRandomSeed()),
-          primary: true,
-        },
-      ],
+      this.playContext.source === 'campaign'
+        ? this.localizedI18n.t('campaign.timeoutBody')
+        : this.i18n.t('timed.timeoutBody'),
+      actions,
       undefined,
       false,
     );

@@ -9,6 +9,7 @@ export class CelebrationView extends Phaser.GameObjects.Container {
     onNext: () => void,
     onCopy: () => void,
     bodyText = i18n.t('celebration.body'),
+    nextLabel = i18n.t('celebration.next'),
   ) {
     super(scene, 800, 450);
     scene.add.existing(this);
@@ -43,7 +44,7 @@ export class CelebrationView extends Phaser.GameObjects.Container {
     this.add([stamp, title, body]);
 
     this.add(this.button(scene, -100, 116, i18n.t('celebration.copy'), onCopy, false));
-    this.add(this.button(scene, 100, 116, i18n.t('celebration.next'), onNext, true));
+    this.add(this.button(scene, 100, 116, nextLabel, onNext, true));
     this.setAlpha(0).setScale(0.92);
     scene.tweens.add({ targets: this, alpha: 1, scale: 1, duration: 360, ease: 'Back.easeOut' });
   }

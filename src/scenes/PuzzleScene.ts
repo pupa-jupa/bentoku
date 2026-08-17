@@ -17,6 +17,7 @@ import { createDailySeed, createRandomSeed } from '../puzzle/SeededRandom';
 import {
   DIFFICULTIES,
   emptyBoard,
+  toBoard,
   type Difficulty,
   type GameMode,
   type PieceId,
@@ -60,6 +61,10 @@ interface SliderSpec {
   onChange: (value: number) => void;
 }
 
+interface ModalLayoutSpec {
+  actionWidth?: number;
+}
+
 export class PuzzleScene extends Phaser.Scene {
   private generator = new PuzzleGenerator();
   private save!: SaveService;
@@ -75,6 +80,7 @@ export class PuzzleScene extends Phaser.Scene {
   private inventory!: InventoryPanel;
   private bento!: BentoBoard;
   private pieces = new Map<PieceId, PieceView>();
+  private usablePieceIds = new Set<PieceId>();
   private selectedPiece: PieceId | null = null;
   private dragging?: PieceView;
   private piecePress?: PiecePress;
@@ -159,12 +165,18 @@ export class PuzzleScene extends Phaser.Scene {
     this.mode = mode;
     this.settings = this.save.updateSettings({ difficulty, mode });
     this.puzzle = this.generator.create(seed, difficulty);
+    this.usablePieceIds = new Set(
+      this.puzzle.solution.filter((pieceId): pieceId is PieceId => pieceId !== null),
+    );
     this.puzzleController = new PuzzleController(this.puzzle);
     const saved =
       mode === 'timed'
         ? { board: emptyBoard(), moves: 0 }
         : this.save.loadPuzzle(this.puzzle.seed, this.puzzle.difficulty, mode);
-    this.placement = new PlacementController(saved.board, saved.moves);
+    const playableBoard = toBoard(
+      saved.board.map((pieceId) => (pieceId && this.usablePieceIds.has(pieceId) ? pieceId : null)),
+    );
+    this.placement = new PlacementController(playableBoard, saved.moves);
     this.selectedPiece = null;
     this.solved = false;
     this.timedOut = false;
@@ -211,6 +223,7 @@ export class PuzzleScene extends Phaser.Scene {
     this.puzzle.pieces.forEach((piece, index) => {
       const position = this.inventory.trayPosition(index);
       const view = new PieceView(this, piece, position.x, position.y);
+      view.setAvailable(this.usablePieceIds.has(piece.id));
       this.pieces.set(piece.id, view);
       this.bindPiece(view);
     });
@@ -238,18 +251,18 @@ export class PuzzleScene extends Phaser.Scene {
     this.seedText.on('pointerout', () => this.seedText.setColor('#74594f'));
 
     this.makeButton({
-      x: 1034,
+      x: 1062,
       y: 54,
-      width: 126,
+      width: 92,
       label: `${this.difficultyLabel(this.puzzle.difficulty)} ▾`,
       callback: () => this.openDifficultySelect(),
       sound: false,
     });
 
     this.makeButton({
-      x: 1162,
+      x: 1166,
       y: 54,
-      width: 110,
+      width: 92,
       label: this.i18n.t('button.daily'),
       callback: () => this.startDaily(),
     });
@@ -332,6 +345,7 @@ export class PuzzleScene extends Phaser.Scene {
         this.solved ||
         this.modal ||
         !this.canPlay() ||
+        !this.usablePieceIds.has(view.piece.id) ||
         (this.tutorial?.active && !this.tutorial.allowsPiece(view.piece.id))
       )
         return;
@@ -377,6 +391,7 @@ export class PuzzleScene extends Phaser.Scene {
         this.solved ||
         this.modal ||
         !this.canPlay() ||
+        !this.usablePieceIds.has(target.piece.id) ||
         (this.tutorial?.active && !this.tutorial.allowsPiece(target.piece.id))
       )
         return;
@@ -435,6 +450,7 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private selectPiece(pieceId: PieceId, toggle = true, withSound = true): void {
+    if (!this.usablePieceIds.has(pieceId)) return;
     if (this.tutorial?.active && !this.tutorial.allowsPiece(pieceId)) return;
     this.selectedPiece = toggle && this.selectedPiece === pieceId ? null : pieceId;
     this.pieces.forEach((view, id) => {
@@ -522,7 +538,9 @@ export class PuzzleScene extends Phaser.Scene {
           ease: 'Back.easeOut',
         });
       } else view.setPosition(position.x, position.y).setScale(1);
-      view.setAlpha(boardSet.has(piece.id) || cellIndex < 0 ? 1 : 0.84);
+      if (this.usablePieceIds.has(piece.id)) {
+        view.setAlpha(boardSet.has(piece.id) || cellIndex < 0 ? 1 : 0.84);
+      }
     });
   }
 
@@ -843,6 +861,8 @@ export class PuzzleScene extends Phaser.Scene {
           },
         },
       ],
+      true,
+      { actionWidth: 210 },
     );
     if (withSound) this.audio.play('note_open');
   }
@@ -887,6 +907,7 @@ export class PuzzleScene extends Phaser.Scene {
     }>,
     sliders?: readonly SliderSpec[],
     dismissible = true,
+    layout: ModalLayoutSpec = {},
   ): void {
     this.closeModal();
     const modal = this.add.container(800, 450).setDepth(this.tutorial?.active ? 5000 : 2600);
@@ -935,7 +956,7 @@ export class PuzzleScene extends Phaser.Scene {
         {
           x: columns === 1 ? 0 : -135 + column * 270,
           y: lastRowY - (rowCount - 1 - row) * 58,
-          width: 238,
+          width: layout.actionWidth ?? 238,
           label: action.label,
           callback: action.callback,
           primary: action.primary ?? (index === actions.length - 1 && actions.length > 1),
@@ -1310,17 +1331,31 @@ export class PuzzleScene extends Phaser.Scene {
     overlay.add([shade, bubble, countText]);
     this.countdown = overlay;
     let count = 3;
-    this.tweens.add({
-      targets: countText,
-      scale: { from: 1.18, to: 1 },
-      duration: 700,
+    const pulse = (): void => {
+      countText.setScale(1.18);
+      this.tweens.add({
+        targets: countText,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 520,
+        ease: 'Sine.easeOut',
+      });
+    };
+    pulse();
+    const countdownEvent = this.time.addEvent({
+      delay: 700,
       repeat: 2,
-      ease: 'Sine.easeOut',
-      onRepeat: () => {
+      callback: () => {
+        if (!overlay.active) {
+          countdownEvent.remove();
+          return;
+        }
         count -= 1;
-        countText.setText(String(count));
-      },
-      onComplete: () => {
+        if (count > 0) {
+          countText.setText(String(count));
+          pulse();
+          return;
+        }
         overlay.destroy(true);
         this.countdown = undefined;
         onComplete();

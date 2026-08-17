@@ -4,6 +4,9 @@ import type { CluePattern } from '../puzzle/types';
 import type { I18nService } from '../i18n/I18nService';
 import { ClueView } from './ClueView';
 
+const PARTIAL_CLUE_OFFSET_X = -12;
+const PARTIAL_CLUE_OFFSET_Y = -24;
+
 export class CluePanel extends Phaser.GameObjects.Container {
   readonly width = 390;
   readonly height = 730;
@@ -47,12 +50,12 @@ export class CluePanel extends Phaser.GameObjects.Container {
       const row = Math.floor(index / 2);
       const itemsInRow = Math.min(2, spatial.length - row * 2);
       const column = index % 2;
-      const xPosition = itemsInRow === 1 ? 0 : -82 + column * 164;
+      const xPosition = (itemsInRow === 1 ? 0 : -82 + column * 164) + PARTIAL_CLUE_OFFSET_X;
       const view = new ClueView(
         scene,
         clue,
         xPosition,
-        compact ? 6 + row * 116 : 20 + row * 138,
+        (compact ? 6 + row * 116 : 20 + row * 138) + PARTIAL_CLUE_OFFSET_Y,
         158,
         compact,
       );

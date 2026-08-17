@@ -11,6 +11,7 @@ export class PieceView extends Phaser.GameObjects.Container {
   private readonly glaze: Phaser.GameObjects.Image;
   private readonly pearl: Phaser.GameObjects.Graphics;
   private readonly ring: Phaser.GameObjects.Graphics;
+  private available = true;
   home = new Phaser.Math.Vector2();
   boardCell: number | null = null;
 
@@ -47,8 +48,39 @@ export class PieceView extends Phaser.GameObjects.Container {
   setHome(x: number, y: number, boardCell: number | null): void {
     this.home.set(x, y);
     this.boardCell = boardCell;
-    const placed = boardCell !== null;
+    this.refreshAppearance();
+  }
+
+  setAvailable(available: boolean): void {
+    this.available = available;
+    this.setSelected(false);
+    if (available) {
+      if (this.input) this.input.enabled = true;
+      else this.setInteractive({ useHandCursor: true });
+      this.scene.input.setDraggable(this, true);
+    } else {
+      this.disableInteractive();
+      this.scene.input.setDraggable(this, false);
+    }
+    this.refreshAppearance();
+  }
+
+  private refreshAppearance(): void {
+    const placed = this.boardCell !== null;
+    if (!this.available) {
+      this.setAlpha(0.46);
+      this.shell.setVisible(false);
+      this.sprite.setTint(0x8c8c8c);
+      this.glaze.setVisible(false);
+      this.pearl.setVisible(false);
+      this.shadow.setScale(1).setAlpha(0.08);
+      return;
+    }
+    this.setAlpha(1);
+    this.sprite.clearTint();
     this.shell.setVisible(placed);
+    this.glaze.setVisible(true);
+    this.pearl.setVisible(true);
     this.glaze.setAlpha(placed ? 0.2 : 0.13);
     this.pearl.setAlpha(placed ? 0.95 : 0.68);
     this.shadow.setScale(placed ? 1.08 : 1).setAlpha(placed ? 0.22 : 0.18);
@@ -56,7 +88,7 @@ export class PieceView extends Phaser.GameObjects.Container {
 
   setSelected(selected: boolean): void {
     this.ring.clear();
-    if (!selected) return;
+    if (!selected || !this.available) return;
     this.ring.lineStyle(5, COLORS.focus, 1);
     this.ring.strokeCircle(0, 0, 57);
     this.ring.lineStyle(2, COLORS.milk, 0.9);
@@ -64,12 +96,14 @@ export class PieceView extends Phaser.GameObjects.Container {
   }
 
   lift(): void {
+    if (!this.available) return;
     this.shadow.setScale(this.boardCell === null ? 1.18 : 1.25).setAlpha(0.26);
     this.scene.tweens.add({ targets: this, scale: 1.07, duration: 100, ease: 'Sine.easeOut' });
     this.setDepth(1000);
   }
 
   settle(reducedMotion: boolean): void {
+    if (!this.available) return;
     this.shadow
       .setScale(this.boardCell === null ? 1 : 1.08)
       .setAlpha(this.boardCell === null ? 0.18 : 0.22);
@@ -102,7 +136,7 @@ export class PieceView extends Phaser.GameObjects.Container {
   }
 
   idle(reducedMotion: boolean): void {
-    if (reducedMotion || this.scene.tweens.isTweening(this)) return;
+    if (!this.available || reducedMotion || this.scene.tweens.isTweening(this)) return;
     this.scene.tweens.add({
       targets: this,
       angle: { from: -1.5, to: 1.5 },

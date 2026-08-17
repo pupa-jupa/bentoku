@@ -2,6 +2,12 @@ import { expect, test, type Page } from '@playwright/test';
 
 interface GameObjectState {
   text?: string;
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+  input?: { enabled: boolean };
+  clue?: { id: string };
   list?: GameObjectState[];
 }
 
@@ -22,7 +28,17 @@ interface SceneState {
     secondCell: number;
   };
   modal?: unknown;
-  pieces: Map<string, { x: number; y: number }>;
+  countdown?: { list: GameObjectState[] };
+  pieces: Map<
+    string,
+    {
+      x: number;
+      y: number;
+      alpha: number;
+      input?: { enabled: boolean };
+      sprite: { tintTopLeft: number };
+    }
+  >;
   bento: { slotWorldPosition(index: number): { x: number; y: number } };
   children: { list: GameObjectState[] };
 }
@@ -210,8 +226,136 @@ test('keeps the complete composition usable in landscape', async ({ page }) => {
   await expect(page.locator('#rotate-device')).toBeHidden();
 });
 
+test('disables and dims the animal family omitted from the solution', async ({ page }) => {
+  const omitted = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    const includedAnimals = new Set(scene.puzzle.solution.map((pieceId) => pieceId.split('_')[0]));
+    return [...scene.pieces.entries()]
+      .filter(([pieceId]) => !includedAnimals.has(pieceId.split('_')[0]))
+      .map(([id, piece]) => ({
+        id,
+        x: piece.x,
+        y: piece.y,
+        alpha: piece.alpha,
+        interactive: piece.input?.enabled ?? false,
+        tint: piece.sprite.tintTopLeft,
+      }));
+  });
+
+  expect(omitted).toHaveLength(3);
+  expect(omitted.every((piece) => !piece.interactive)).toBe(true);
+  expect(omitted.every((piece) => piece.alpha < 0.7)).toBe(true);
+  expect(omitted.every((piece) => piece.tint !== 0xffffff)).toBe(true);
+
+  const disabledPoint = await screenPoint(page, omitted[0]!.x, omitted[0]!.y);
+  const firstSlot = await screenPoint(page, 637, 235);
+  await page.mouse.click(disabledPoint.x, disabledPoint.y);
+  await page.mouse.click(firstSlot.x, firstSlot.y);
+  const placement = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    return {
+      selectedPiece: scene.selectedPiece,
+      board: scene.placement.board,
+      moves: scene.placement.moves,
+    };
+  });
+  expect(placement).toEqual({
+    selectedPiece: null,
+    board: Array.from({ length: 9 }, () => null),
+    moves: 0,
+  });
+});
+
+test('keeps toolbar, settings actions, and partial clues inside their intended layout', async ({
+  page,
+}) => {
+  const toolbar = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    const labels = new Set(['Daily', 'Rush']);
+    return scene.children.list
+      .filter((object) =>
+        object.list?.some(
+          (child) => child.text && (labels.has(child.text) || child.text.endsWith('▾')),
+        ),
+      )
+      .map((object) => ({
+        x: object.x,
+        width: object.width,
+        role: object.list?.some((child) => child.text?.endsWith('▾'))
+          ? 'difficulty'
+          : object.list?.find((child) => child.text)?.text?.toLowerCase(),
+      }));
+  });
+  expect(toolbar).toEqual([
+    { x: 1062, width: 92, role: 'difficulty' },
+    { x: 1166, width: 92, role: 'daily' },
+    { x: 1270, width: 92, role: 'rush' },
+  ]);
+
+  const settingsButton = await screenPoint(page, 1490, 54);
+  await page.mouse.click(settingsButton.x, settingsButton.y);
+  const settingsActionWidths = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    const modal = scene.modal as { list?: GameObjectState[] } | undefined;
+    return (
+      modal?.list
+        ?.filter((object) => object.list?.some((child) => typeof child.text === 'string'))
+        .map((object) => object.width) ?? []
+    );
+  });
+  expect(settingsActionWidths).toEqual([210, 210, 210, 210, 210]);
+
+  await page.goto('/?seed=CLUE-BOUNDS&difficulty=master');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (
+          window as unknown as {
+            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+          }
+        ).__BENTOKU_GAME__;
+        return Boolean(scene?.scene.getScene('PuzzleScene')?.puzzle);
+      }),
+    )
+    .toBe(true);
+  const partialLayout = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    const panel = scene.children.list.find((object) =>
+      object.list?.some((child) => child.clue?.id === 'anchor-map'),
+    )!;
+    const partial = panel.list!.filter((child) => child.clue && child.clue.id !== 'anchor-map');
+    return {
+      averageX: partial.reduce((sum, clue) => sum + (clue.x ?? 0), 0) / partial.length,
+      bottom:
+        (panel.y ?? 0) + Math.max(...partial.map((clue) => (clue.y ?? 0) + (clue.height ?? 0) / 2)),
+    };
+  });
+  expect(partialLayout.averageX).toBe(-12);
+  expect(partialLayout.bottom).toBeLessThanOrEqual(755);
+});
+
 test('lets the player switch deduction difficulty and preserves the choice', async ({ page }) => {
-  const difficultyButton = await screenPoint(page, 1034, 54);
+  const difficultyButton = await screenPoint(page, 1062, 54);
   await page.mouse.click(difficultyButton.x, difficultyButton.y);
 
   const masterButton = await screenPoint(page, 665, 613);
@@ -503,7 +647,7 @@ test('localizes Settings, difficulty guidance, and Help without translating leve
     scene.closeModal();
   });
 
-  const difficultyButton = await screenPoint(page, 1034, 54);
+  const difficultyButton = await screenPoint(page, 1062, 54);
   await page.mouse.click(difficultyButton.x, difficultyButton.y);
   const difficultyCopy = await sceneTexts(page);
   expect(difficultyCopy).toContain('Выберите уровень сложности');
@@ -538,6 +682,30 @@ test('starts Master Rush at 1:45 and removes Reveal from timed help', async ({ p
   await page.mouse.click(rushButton.x, rushButton.y);
   const startButton = await screenPoint(page, 800, 527);
   await page.mouse.click(startButton.x, startButton.y);
+
+  const countdownValues: string[] = [];
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const state = await page.evaluate(() => {
+      const scene = (
+        window as unknown as {
+          __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+        }
+      ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+      return {
+        values:
+          scene.countdown?.list
+            .map((object) => object.text)
+            .filter((text): text is string => typeof text === 'string') ?? [],
+        timerState: scene.timer?.state,
+      };
+    });
+    for (const value of state.values) {
+      if (countdownValues.at(-1) !== value) countdownValues.push(value);
+    }
+    if (state.timerState === 'running') break;
+    await page.waitForTimeout(100);
+  }
+  expect(countdownValues).toEqual(['3', '2', '1']);
 
   await expect
     .poll(

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 interface GameObjectState {
+  type?: string;
   text?: string;
   width?: number;
   height?: number;
@@ -200,7 +201,7 @@ test('supports drag, undo, tap placement, and a complete winning run', async ({ 
     const slotPoint = await screenPoint(page, puzzle.slots[index]!.x, puzzle.slots[index]!.y);
     await page.mouse.click(piecePoint.x, piecePoint.y);
     await page.mouse.click(slotPoint.x, slotPoint.y);
-    await page.waitForTimeout(220);
+    if (index < puzzle.solution.length - 1) await page.waitForTimeout(220);
   }
 
   await expect
@@ -211,10 +212,15 @@ test('supports drag, undo, tap placement, and a complete winning run', async ({ 
             __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
           }
         ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
-        return { solved: scene.solved, moves: scene.placement.moves, modal: Boolean(scene.modal) };
+        return {
+          solved: scene.solved,
+          moves: scene.placement.moves,
+          modal: Boolean(scene.modal),
+          activeSparkles: scene.children.list.filter((object) => object.type === 'Star').length,
+        };
       }),
     )
-    .toEqual({ solved: true, moves: 9, modal: true });
+    .toEqual({ solved: true, moves: 9, modal: true, activeSparkles: 0 });
 });
 
 test('keeps the complete composition usable in landscape', async ({ page }) => {
@@ -304,6 +310,19 @@ test('keeps toolbar, settings actions, and partial clues inside their intended l
     { x: 1270, width: 92, role: 'rush' },
   ]);
 
+  const helpGlyphY = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    const help = scene.children.list.find((object) =>
+      object.list?.some((child) => child.text === '?'),
+    );
+    return help?.list?.find((child) => child.text === '?')?.y;
+  });
+  expect(helpGlyphY).toBe(4);
+
   const settingsButton = await screenPoint(page, 1490, 54);
   await page.mouse.click(settingsButton.x, settingsButton.y);
   const settingsActionWidths = await page.evaluate(() => {
@@ -350,7 +369,7 @@ test('keeps toolbar, settings actions, and partial clues inside their intended l
         (panel.y ?? 0) + Math.max(...partial.map((clue) => (clue.y ?? 0) + (clue.height ?? 0) / 2)),
     };
   });
-  expect(partialLayout.averageX).toBe(-12);
+  expect(partialLayout.averageX).toBe(-42);
   expect(partialLayout.bottom).toBeLessThanOrEqual(755);
 });
 

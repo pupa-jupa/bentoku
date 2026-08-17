@@ -4,7 +4,7 @@ import type { CluePattern } from '../puzzle/types';
 import type { I18nService } from '../i18n/I18nService';
 import { ClueView } from './ClueView';
 
-const PARTIAL_CLUE_OFFSET_X = -12;
+const PARTIAL_CLUE_OFFSET_X = -42;
 const PARTIAL_CLUE_OFFSET_Y = -24;
 
 export class CluePanel extends Phaser.GameObjects.Container {

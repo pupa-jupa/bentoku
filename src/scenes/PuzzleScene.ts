@@ -43,9 +43,19 @@ interface ButtonSpec {
   callback: () => void;
   primary?: boolean;
   icon?: boolean;
+  textOffsetY?: number;
   sound?: SoundName | false;
   allowDuringTutorial?: boolean;
 }
+
+const CELEBRATION_PIECE_STAGGER_MS = 55;
+const CELEBRATION_SPARKLE_STAGGER_MS = 60;
+const CELEBRATION_SPARKLE_DURATION_MS = 520;
+const CELEBRATION_MODAL_DELAY_MS =
+  8 * CELEBRATION_PIECE_STAGGER_MS +
+  2 * CELEBRATION_SPARKLE_STAGGER_MS +
+  CELEBRATION_SPARKLE_DURATION_MS +
+  70;
 
 interface PiecePress {
   pieceId: PieceId;
@@ -291,6 +301,7 @@ export class PuzzleScene extends Phaser.Scene {
       label: '?',
       callback: () => this.openHelp(),
       icon: true,
+      textOffsetY: 4,
       sound: false,
     });
     this.makeButton({
@@ -587,7 +598,7 @@ export class PuzzleScene extends Phaser.Scene {
       this.placement.board.forEach((pieceId, index) => {
         if (!pieceId) return;
         const view = this.pieces.get(pieceId)!;
-        this.time.delayedCall(index * 55, () => {
+        this.time.delayedCall(index * CELEBRATION_PIECE_STAGGER_MS, () => {
           this.tweens.add({
             targets: view,
             y: view.y - 15,
@@ -600,7 +611,7 @@ export class PuzzleScene extends Phaser.Scene {
       });
       this.tweens.add({ targets: this.bento, y: this.bento.y - 9, duration: 420, yoyo: true });
     }
-    this.time.delayedCall(this.settings.reducedMotion ? 150 : 850, () => {
+    this.time.delayedCall(this.settings.reducedMotion ? 150 : CELEBRATION_MODAL_DELAY_MS, () => {
       this.modal = new CelebrationView(
         this,
         this.i18n,
@@ -635,8 +646,8 @@ export class PuzzleScene extends Phaser.Scene {
         alpha: 0,
         angle: 45,
         y: star.y - 25,
-        duration: 520,
-        delay: index * 60,
+        duration: CELEBRATION_SPARKLE_DURATION_MS,
+        delay: index * CELEBRATION_SPARKLE_STAGGER_MS,
         onComplete: () => star.destroy(),
       });
     }
@@ -705,7 +716,7 @@ export class PuzzleScene extends Phaser.Scene {
           .setDisplaySize(spec.icon ? 55 : spec.width + 6, spec.icon ? 55 : 54)
       : this.createButtonFallback(spec, height);
     const text = this.add
-      .text(0, spec.icon ? -1 : 0, spec.label, {
+      .text(0, spec.textOffsetY ?? (spec.icon ? -1 : 0), spec.label, {
         fontFamily: FONT_BODY,
         fontSize: spec.icon ? '24px' : '16px',
         fontStyle: 'bold',

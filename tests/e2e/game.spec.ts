@@ -104,6 +104,24 @@ const enterInfinite = async (page: Page): Promise<void> => {
     .toBe(true);
 };
 
+const playStoryIntro = async (page: Page): Promise<void> => {
+  await expect.poll(() => sceneTexts(page, 'StoryScene')).toContain('Continue');
+  const dayContinue = await screenPoint(page, 785, 760);
+  await page.mouse.click(dayContinue.x, dayContinue.y);
+  await page.waitForTimeout(350);
+  await expect
+    .poll(async () =>
+      (await sceneTexts(page, 'StoryScene')).some((copy) => copy.includes('Visitor artwork slot')),
+    )
+    .toBe(true);
+
+  for (let index = 0; index < 6; index += 1) {
+    const continueButton = await screenPoint(page, 1285, 746);
+    await page.mouse.click(continueButton.x, continueButton.y);
+    await page.waitForTimeout(350);
+  }
+};
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/?seed=BENTO-E2E-0001&difficulty=gentle');
   await page.evaluate(() => localStorage.clear());
@@ -197,6 +215,8 @@ test('opens the real campaign book and unlocks the next fixed order after a win'
 
   const startOrder = await screenPoint(page, 1090, 705);
   await page.mouse.click(startOrder.x, startOrder.y);
+  await expect.poll(() => sceneTexts(page, 'StoryScene')).toContain('Morning Bows');
+  await playStoryIntro(page);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -313,6 +333,13 @@ test('keeps the only campaign finale timed at 1:45 with Reveal locked', async ({
     .toContain(
       "Complete Dunya's final Master order in 1 minute 45 seconds. Reveal is locked, and every retry keeps the timer.",
     );
+
+  expect(
+    await page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem('bentoku.save.v3') ?? '{}');
+      return stored.album?.viewedStories;
+    }),
+  ).toContain('chapter-1:intro');
   const startChallenge = await screenPoint(page, 800, 527);
   await page.mouse.click(startChallenge.x, startChallenge.y);
   await expect

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { getCampaignOrder } from '../campaign/campaignData';
+import { getCampaignStoryForOrder, storyEventId } from '../campaign/storyData';
 import { COLORS, FONT_BODY, FONT_DISPLAY } from '../game/constants';
 import { INFINITE_PLAY_CONTEXT, RUSH_PLAY_CONTEXT, type PlayContext } from '../game/playContext';
 import {
@@ -675,8 +676,20 @@ export class PuzzleScene extends Phaser.Scene {
         this.i18n,
         () => {
           this.audio.play('ui_tap');
-          if (this.playContext.source === 'campaign') this.scene.start('CampaignScene');
-          else if (this.mode === 'timed') this.startTimedChallenge(createRandomSeed());
+          if (this.playContext.source === 'campaign' && this.playContext.campaignOrderId) {
+            const story = getCampaignStoryForOrder(this.playContext.campaignOrderId);
+            const shouldShowChapterComplete =
+              story?.finalOrderId === this.playContext.campaignOrderId &&
+              !this.save.hasViewedCampaignStory(storyEventId(story.chapter, 'chapterComplete'));
+            if (shouldShowChapterComplete) {
+              this.scene.start('StoryScene', {
+                orderId: this.playContext.campaignOrderId,
+                phase: 'chapterComplete',
+              });
+            } else {
+              this.scene.start('CampaignScene');
+            }
+          } else if (this.mode === 'timed') this.startTimedChallenge(createRandomSeed());
           else this.startRandom();
         },
         () => void this.copySeed(),

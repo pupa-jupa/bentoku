@@ -6,6 +6,13 @@ import {
   getNextCampaignOrder,
   isCampaignOrderUnlocked,
 } from '../src/campaign/campaignData';
+import {
+  CAMPAIGN_STORIES,
+  getCampaignStoryForOrder,
+  localizeStoryText,
+  storyEventId,
+  visitorTextureKey,
+} from '../src/campaign/storyData';
 import { HintController } from '../src/gameplay/HintController';
 import { solveHumanly } from '../src/puzzle/HumanSolver';
 import { PuzzleGenerator } from '../src/puzzle/PuzzleGenerator';
@@ -62,5 +69,30 @@ describe('campaign framework', () => {
     const puzzle = new PuzzleGenerator().create('CAMPAIGN-HINT-GUARD', 'cozy');
     expect(new HintController(false).reveal(puzzle, Array(9).fill(null))).toBeNull();
     expect(new HintController(true).reveal(puzzle, Array(9).fill(null))).toBe(0);
+  });
+
+  it('provides one complete localized visitor story for every chapter', () => {
+    expect(CAMPAIGN_STORIES).toHaveLength(5);
+    expect(new Set(CAMPAIGN_STORIES.map((story) => story.visitor.id)).size).toBe(5);
+
+    for (const story of CAMPAIGN_STORIES) {
+      expect(story.firstOrderId).toBe(`chapter-${story.chapter}-order-1`);
+      expect(story.finalOrderId).toBe(`chapter-${story.chapter}-order-6`);
+      expect(story.lines.length).toBeGreaterThanOrEqual(6);
+      expect(story.lines.some((line) => line.mood === 'neutral')).toBe(true);
+      expect(story.lines.some((line) => line.mood === 'speaking')).toBe(true);
+      expect(story.lines.some((line) => line.mood === 'pleased')).toBe(true);
+      expect(localizeStoryText(story.opening, 'en')).not.toBe('');
+      expect(localizeStoryText(story.opening, 'ru')).not.toBe('');
+      expect(storyEventId(story.chapter, 'intro')).toBe(`chapter-${story.chapter}:intro`);
+      expect(storyEventId(story.chapter, 'chapterComplete')).toBe(
+        `chapter-${story.chapter}:complete`,
+      );
+      expect(visitorTextureKey(story.visitor.id, 'pleased')).toBe(
+        `visitor_${story.visitor.id}_pleased`,
+      );
+      expect(getCampaignStoryForOrder(story.firstOrderId)).toBe(story);
+      expect(getCampaignStoryForOrder(story.finalOrderId)).toBe(story);
+    }
   });
 });

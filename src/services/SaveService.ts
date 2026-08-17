@@ -6,6 +6,7 @@ import {
   type CampaignOrderId,
 } from '../campaign/campaignData';
 import type { PlayContext } from '../game/playContext';
+import type { CampaignStoryEventId } from '../campaign/storyData';
 import { parseDifficulty } from '../puzzle/DifficultyEvaluator';
 import {
   emptyBoard,
@@ -237,6 +238,16 @@ export class SaveService {
     return this.data.campaign.currentOrderId;
   }
 
+  get viewedCampaignStoryIds(): readonly CampaignStoryEventId[] {
+    return this.data.album.viewedStories.filter((entry): entry is CampaignStoryEventId =>
+      /^chapter-[1-5]:(intro|complete)$/.test(entry),
+    );
+  }
+
+  hasViewedCampaignStory(storyId: CampaignStoryEventId): boolean {
+    return this.data.album.viewedStories.includes(storyId);
+  }
+
   loadPuzzle(
     seed: string,
     difficulty: Difficulty,
@@ -318,6 +329,13 @@ export class SaveService {
     this.data.campaign.currentOrderId = getNextCampaignOrder(orderId)?.id ?? orderId;
     delete this.data.currentPuzzle;
     this.persist();
+  }
+
+  markCampaignStoryViewed(storyId: CampaignStoryEventId): void {
+    if (!this.data.album.viewedStories.includes(storyId)) {
+      this.data.album.viewedStories.push(storyId);
+      this.persist();
+    }
   }
 
   startTimedAttempt(): void {

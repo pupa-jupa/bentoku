@@ -5,6 +5,7 @@ import { CampaignScene } from '../scenes/CampaignScene';
 import { PreloadScene } from '../scenes/PreloadScene';
 import { MenuScene } from '../scenes/MenuScene';
 import { PuzzleScene } from '../scenes/PuzzleScene';
+import { StoryScene } from '../scenes/StoryScene';
 
 export const createGameConfig = (): Phaser.Types.Core.GameConfig => ({
   type: Phaser.AUTO,
@@ -29,5 +30,5 @@ export const createGameConfig = (): Phaser.Types.Core.GameConfig => ({
     pixelArt: false,
     powerPreference: 'high-performance',
   },
-  scene: [BootScene, PreloadScene, MenuScene, CampaignScene, PuzzleScene],
+  scene: [BootScene, PreloadScene, MenuScene, CampaignScene, StoryScene, PuzzleScene],
 });

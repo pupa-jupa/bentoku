@@ -128,4 +128,18 @@ describe('localization and save migration', () => {
     save.selectCampaignOrder('chapter-1-order-2');
     expect(new SaveService().selectedCampaignOrderId).toBe('chapter-1-order-2');
   });
+
+  it('records campaign story events once and ignores unrelated album values', () => {
+    const save = new SaveService();
+    expect(save.viewedCampaignStoryIds).toEqual([]);
+    save.markCampaignStoryViewed('chapter-1:intro');
+    save.markCampaignStoryViewed('chapter-1:intro');
+    expect(save.hasViewedCampaignStory('chapter-1:intro')).toBe(true);
+    expect(new SaveService().viewedCampaignStoryIds).toEqual(['chapter-1:intro']);
+
+    const stored = JSON.parse(storage.getItem('bentoku.save.v3') ?? '{}');
+    stored.album.viewedStories.push('not-a-story');
+    storage.setItem('bentoku.save.v3', JSON.stringify(stored));
+    expect(new SaveService().viewedCampaignStoryIds).toEqual(['chapter-1:intro']);
+  });
 });

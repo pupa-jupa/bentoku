@@ -324,6 +324,11 @@ export class CampaignScene extends Phaser.Scene {
 
   private startOrder(order: CampaignOrder): void {
     this.save.selectCampaignOrder(order.id);
+    const hasSavedBoard = this.save.currentPuzzleCampaignOrderId === order.id;
+    if (order.order === 1 && !hasSavedBoard) {
+      this.scene.start('StoryScene', { orderId: order.id, phase: 'intro' });
+      return;
+    }
     this.scene.start('PuzzleScene', {
       context: campaignPlayContext(order.id, order.timed, order.durationMs),
     });

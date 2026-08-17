@@ -850,6 +850,13 @@ export class PuzzleScene extends Phaser.Scene {
         },
       );
     }
+    actions.push({
+      label: this.localizedI18n.t('settings.backToCafe'),
+      callback: () => {
+        this.closeModal();
+        this.scene.start('MenuScene');
+      },
+    });
     this.openModal(
       this.localizedI18n.t('settings.title'),
       this.localizedI18n.t('settings.body'),

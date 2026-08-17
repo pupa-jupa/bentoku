@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 interface GameObjectState {
+  name?: string;
   type?: string;
   text?: string;
   width?: number;
@@ -10,6 +11,7 @@ interface GameObjectState {
   input?: { enabled: boolean };
   clue?: { id: string };
   list?: GameObjectState[];
+  texture?: { key: string };
 }
 
 interface SceneState {
@@ -53,19 +55,53 @@ const screenPoint = async (page: Page, x: number, y: number) =>
     { x, y },
   );
 
-const sceneTexts = async (page: Page): Promise<string[]> =>
-  page.evaluate(() => {
+const sceneTexts = async (page: Page, sceneKey = 'PuzzleScene'): Promise<string[]> =>
+  page.evaluate((key) => {
     const scene = (
       window as unknown as {
         __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
       }
-    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    ).__BENTOKU_GAME__.scene.getScene(key);
     const collect = (object: GameObjectState): string[] => [
       ...(object.text ? [object.text] : []),
       ...(object.list?.flatMap(collect) ?? []),
     ];
     return scene.children.list.flatMap(collect);
-  });
+  }, sceneKey);
+
+const enterInfinite = async (page: Page): Promise<void> => {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (
+          window as unknown as {
+            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+          }
+        ).__BENTOKU_GAME__;
+        const menu = game?.scene.getScene('MenuScene');
+        const hasAction = (objects: GameObjectState[]): boolean =>
+          objects.some(
+            (object) => object.name === 'menu-action-infinite' || hasAction(object.list ?? []),
+          );
+        return Boolean(menu && hasAction(menu.children.list));
+      }),
+    )
+    .toBe(true);
+  const infinite = await screenPoint(page, 312, 434);
+  await page.mouse.click(infinite.x, infinite.y);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (
+          window as unknown as {
+            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+          }
+        ).__BENTOKU_GAME__;
+        return Boolean(game?.scene.getScene('PuzzleScene')?.puzzle);
+      }),
+    )
+    .toBe(true);
+};
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?seed=BENTO-E2E-0001&difficulty=gentle');
@@ -83,18 +119,51 @@ test.beforeEach(async ({ page }) => {
   );
   await page.reload();
   await expect(page.locator('canvas')).toBeVisible();
+  await enterInfinite(page);
+});
+
+test('opens on the four-action Dunya café menu before gameplay', async ({ page }) => {
+  await page.goto('/');
+  await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Campaign');
+  const copy = await sceneTexts(page, 'MenuScene');
+  expect(copy).toEqual(
+    expect.arrayContaining(['Campaign', 'Infinite', 'Achievements', 'Settings']),
+  );
+
+  const initialDunya = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('MenuScene');
+    const flatten = (objects: GameObjectState[]): GameObjectState[] =>
+      objects.flatMap((object) => [object, ...flatten(object.list ?? [])]);
+    const all = flatten(scene.children.list);
+    return {
+      actions: all.filter((object) => object.name?.startsWith('menu-action-')).length,
+      texture: all.find((object) => object.name === 'dunya')?.texture?.key,
+    };
+  });
+  expect(initialDunya).toEqual({ actions: 4, texture: 'dunya_neutral' });
+
+  const campaign = await screenPoint(page, 312, 268);
+  await page.mouse.move(campaign.x, campaign.y);
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const game = (
+        const scene = (
           window as unknown as {
-            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+            __BENTOKU_GAME__: {
+              scene: { getScene(key: string): { dunya?: { texture?: { key: string } } } };
+            };
           }
-        ).__BENTOKU_GAME__;
-        return Boolean(game?.scene.getScene('PuzzleScene')?.puzzle);
+        ).__BENTOKU_GAME__.scene.getScene('MenuScene');
+        return scene.dunya?.texture?.key;
       }),
     )
-    .toBe(true);
+    .toBe('dunya_focused');
+
+  await enterInfinite(page);
 });
 
 test('loads only WebP artwork without console errors', async ({ page }) => {
@@ -105,18 +174,7 @@ test('loads only WebP artwork without console errors', async ({ page }) => {
   });
   await page.reload();
   await page.waitForLoadState('networkidle');
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const game = (
-          window as unknown as {
-            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
-          }
-        ).__BENTOKU_GAME__;
-        return Boolean(game?.scene.getScene('PuzzleScene')?.puzzle);
-      }),
-    )
-    .toBe(true);
+  await enterInfinite(page);
   const requests = await page.evaluate(() =>
     performance
       .getEntriesByType('resource')
@@ -124,8 +182,8 @@ test('loads only WebP artwork without console errors', async ({ page }) => {
       .filter((name) => /\.(webp|png|jpe?g)(\?|$)/i.test(name)),
   );
   // The favicon may be fetched by the browser process without appearing in
-  // the page resource timeline. Phaser itself preloads exactly 28 images.
-  expect(requests.length).toBe(28);
+  // the page resource timeline. Phaser itself preloads exactly 38 images.
+  expect(requests.length).toBe(38);
   expect(requests.every((name) => name.endsWith('.webp'))).toBe(true);
   expect(errors).toEqual([]);
   const musicRequests = await page.evaluate(() =>
@@ -134,7 +192,10 @@ test('loads only WebP artwork without console errors', async ({ page }) => {
       .map((entry) => new URL(entry.name).pathname)
       .filter((name) => name.startsWith('/assets/music/')),
   );
-  expect(musicRequests).toEqual(['/assets/music/sunlit_puzzle.mp3']);
+  expect(musicRequests).toEqual([
+    '/assets/music/sunlit_puzzle.mp3',
+    '/assets/music/paper_lantern_logic.mp3',
+  ]);
   const defaultMusicVolume = await page.evaluate(
     () =>
       (
@@ -338,21 +399,10 @@ test('keeps toolbar, settings actions, and partial clues inside their intended l
         .map((object) => object.width) ?? []
     );
   });
-  expect(settingsActionWidths).toEqual([210, 210, 210, 210, 210]);
+  expect(settingsActionWidths).toEqual([210, 210, 210, 210, 210, 210]);
 
   await page.goto('/?seed=CLUE-BOUNDS&difficulty=master');
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const scene = (
-          window as unknown as {
-            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
-          }
-        ).__BENTOKU_GAME__;
-        return Boolean(scene?.scene.getScene('PuzzleScene')?.puzzle);
-      }),
-    )
-    .toBe(true);
+  await enterInfinite(page);
   const partialLayout = await page.evaluate(() => {
     const scene = (
       window as unknown as {
@@ -397,6 +447,7 @@ test('lets the player switch deduction difficulty and preserves the choice', asy
     .toEqual({ difficulty: 'master', query: 'master', filled: 0 });
 
   await page.reload();
+  await enterInfinite(page);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -416,6 +467,7 @@ test('keeps invalid tutorial placements recoverable and completes the guided pat
 }) => {
   await page.evaluate(() => localStorage.clear());
   await page.goto('/');
+  await enterInfinite(page);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -560,6 +612,7 @@ test('allows Settings during the tutorial and can skip into an empty Cozy game',
 }) => {
   await page.evaluate(() => localStorage.clear());
   await page.goto('/');
+  await enterInfinite(page);
   await expect
     .poll(() =>
       page.evaluate(

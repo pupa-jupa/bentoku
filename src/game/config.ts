@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from './constants';
 import { BootScene } from '../scenes/BootScene';
 import { PreloadScene } from '../scenes/PreloadScene';
+import { MenuScene } from '../scenes/MenuScene';
 import { PuzzleScene } from '../scenes/PuzzleScene';
 
 export const createGameConfig = (): Phaser.Types.Core.GameConfig => ({
@@ -27,5 +28,5 @@ export const createGameConfig = (): Phaser.Types.Core.GameConfig => ({
     pixelArt: false,
     powerPreference: 'high-performance',
   },
-  scene: [BootScene, PreloadScene, PuzzleScene],
+  scene: [BootScene, PreloadScene, MenuScene, PuzzleScene],
 });

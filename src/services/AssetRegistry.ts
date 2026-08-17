@@ -29,6 +29,25 @@ export const environmentAssets: AssetEntry[] = [
   { key: 'tiny_sparkle', path: 'assets/ui/tiny_sparkle.webp' },
 ];
 
+export const menuAssets: AssetEntry[] = [
+  {
+    key: 'menu_cafe_background',
+    path: 'assets/menu/main-menu-cafe-background-v1.webp',
+  },
+  {
+    key: 'menu_display_foreground',
+    path: 'assets/menu/main-menu-display-foreground-v1.webp',
+  },
+  { key: 'dunya_neutral', path: 'assets/characters/dunya-neutral-v1.webp' },
+  { key: 'dunya_blink', path: 'assets/characters/dunya-blink-v1.webp' },
+  { key: 'dunya_speaking', path: 'assets/characters/dunya-speaking-v1.webp' },
+  { key: 'dunya_delighted', path: 'assets/characters/dunya-delighted-v1.webp' },
+  { key: 'dunya_focused', path: 'assets/characters/dunya-focused-v1.webp' },
+  { key: 'menu_button_normal', path: 'assets/ui/menu-button-base-v1.webp' },
+  { key: 'menu_button_hover', path: 'assets/ui/menu-button-hover-v1.webp' },
+  { key: 'menu_button_pressed', path: 'assets/ui/menu-button-pressed-v1.webp' },
+];
+
 export const soundAssets = {
   piece_pick: { key: 'sfx_piece_pick', path: 'assets/sfx/piece_pick.wav' },
   piece_drop: { key: 'sfx_piece_drop', path: 'assets/sfx/piece_drop.wav' },

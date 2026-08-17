@@ -147,3 +147,44 @@ asset.
 `output/imagegen/main-menu-composition-v1.png`. It layers Dunya behind the display foreground and
 uses four copies of the blank button with separately rendered English labels. It does not alter
 runtime code or preload the new assets.
+
+## Dunya expression family v1
+
+Each state used `dunya-neutral-v1.png` as an identity and geometry reference. The shared prompt
+locked Dunya's adult features, head angle, hair strands, bow, clothing, hands, pose, silhouette,
+camera, light, color, 1024 × 1536 canvas, scale, crop, and placement. It prohibited waving, body
+movement, new objects, text, and shadows. The only requested edits were:
+
+- **Blink:** both eyelids gently closed, with the same small warm smile.
+- **Speaking:** calm open eyes and a mouth only slightly open as if speaking softly.
+- **Delighted:** a subtly brighter closed-mouth smile and gently happy eyes.
+- **Focused:** attentive eyes, relaxed closed mouth, and subtly intent eyebrows; never angry.
+
+Every generation used a fully opaque electric-blue `#0000FF` background, followed by
+`scripts/extract-blue-chroma.mjs` for spill-free alpha extraction.
+
+**Results:**
+
+- `art/user-assets/characters/dunya-blink-v1.png`
+- `art/user-assets/characters/dunya-speaking-v1.png`
+- `art/user-assets/characters/dunya-delighted-v1.png`
+- `art/user-assets/characters/dunya-focused-v1.png`
+
+## Menu-button interaction family v1
+
+Both variants used `menu-button-base-v1.png` as the exact design reference. The prompt preserved
+the silhouette, proportions, bow, ruffles, lace, rim, blank center, front view, and all decorative
+elements. It prohibited text, icons, new decoration, cast shadows, resizing, or reshaping.
+
+- **Hover:** brighter pearl highlights and a subtle warm-pink luminous glaze.
+- **Pressed:** slightly deeper strawberry glaze, reduced top highlight, and gentle inset shading
+  inside the label field.
+
+The blue `#0000FF` backgrounds were extracted to alpha, then
+`scripts/normalize-menu-button.mjs` placed both variants on the exact approved 768 × 256 canvas
+and content bounds.
+
+**Results:**
+
+- `art/user-assets/ui/menu-button-hover-v1.png`
+- `art/user-assets/ui/menu-button-pressed-v1.png`

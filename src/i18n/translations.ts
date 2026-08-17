@@ -1,6 +1,20 @@
 export const en = {
   'app.ariaLabel': 'Bentoku cozy bento deduction puzzle',
   'brand.subtitle': 'a tiny logic lunch',
+  'menu.tagline': 'A TINY LOLITA CAFÉ',
+  'menu.campaign': 'Campaign',
+  'menu.infinite': 'Infinite',
+  'menu.achievements': 'Achievements',
+  'menu.settings': 'Settings',
+  'menu.campaignTitle': "Dunya's order book",
+  'menu.campaignBody':
+    'Five chapters · 30 handcrafted orders\n\nHelp Dunya prepare the family café for the city sweets festival. Each chapter brings a new visitor and a more demanding set of bento notes.',
+  'menu.campaignStatus': 'The first chapter is being prepared for the next local checkpoint.',
+  'menu.albumTitle': 'Bentoku Album',
+  'menu.albumBody':
+    'Campaign stamps · visitor portraits · eight achievements · appearance rewards · Rush records',
+  'menu.albumStatus': 'Your real local progress will appear here as each collection opens.',
+  'menu.back': 'Back to café',
   'preload.packing': 'Packing your bento…',
   'preload.ready': 'Ready!',
   'inventory.title': 'BENTO FRIENDS',
@@ -35,6 +49,7 @@ export const en = {
   'settings.effectsVolume': 'Effects volume',
   'settings.music': 'Music',
   'settings.language': 'Language: {language}',
+  'settings.backToCafe': 'Back to café',
   'language.en': 'English',
   'language.ru': 'Русский',
   'difficulty.title': 'Choose a deduction level',
@@ -145,6 +160,21 @@ export type TranslationKey = keyof typeof en;
 export const ru: Record<TranslationKey, string> = {
   'app.ariaLabel': 'Bentoku — уютная логическая головоломка с бенто',
   'brand.subtitle': 'маленький логический обед',
+  'menu.tagline': 'МАЛЕНЬКОЕ ЛОЛИТА-КАФЕ',
+  'menu.campaign': 'Кампания',
+  'menu.infinite': 'Бесконечный режим',
+  'menu.achievements': 'Достижения',
+  'menu.settings': 'Настройки',
+  'menu.campaignTitle': 'Книга заказов Дуни',
+  'menu.campaignBody':
+    'Пять глав · 30 продуманных заказов\n\nПомогите Дуне подготовить семейное кафе к городскому фестивалю сладостей. В каждой главе появится новый посетитель, а записки с заказами станут сложнее.',
+  'menu.campaignStatus': 'Первая глава готовится к следующему локальному этапу.',
+  'menu.albumTitle': 'Альбом Bentoku',
+  'menu.albumBody':
+    'Печати кампании · портреты посетителей · восемь достижений · оформление · рекорды Rush',
+  'menu.albumStatus':
+    'Здесь будет появляться настоящий локальный прогресс по мере открытия коллекций.',
+  'menu.back': 'Вернуться в кафе',
   'preload.packing': 'Собираем ваше бенто…',
   'preload.ready': 'Готово!',
   'inventory.title': 'ДРУЗЬЯ БЕНТО',
@@ -179,6 +209,7 @@ export const ru: Record<TranslationKey, string> = {
   'settings.effectsVolume': 'Громкость эффектов',
   'settings.music': 'Музыка',
   'settings.language': 'Язык: {language}',
+  'settings.backToCafe': 'Вернуться в кафе',
   'language.en': 'English',
   'language.ru': 'Русский',
   'difficulty.title': 'Выберите уровень сложности',

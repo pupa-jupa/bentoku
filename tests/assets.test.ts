@@ -1,15 +1,17 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import sharp from 'sharp';
 import {
   clueAssets,
   environmentAssets,
+  menuAssets,
   musicAssets,
   pieceAssets,
   soundAssets,
 } from '../src/services/AssetRegistry';
 
-const runtimeAssets = [...pieceAssets, ...clueAssets, ...environmentAssets];
+const runtimeAssets = [...pieceAssets, ...clueAssets, ...environmentAssets, ...menuAssets];
 
 const expectedSoundProfiles = {
   piece_pick: { duration: 0.28, peakDb: -20 },
@@ -31,7 +33,7 @@ const walk = (directory: string): string[] =>
 
 describe('production assets', () => {
   it('registers only WebP images that exist', () => {
-    expect(runtimeAssets).toHaveLength(28);
+    expect(runtimeAssets).toHaveLength(38);
     for (const asset of runtimeAssets) {
       expect(asset.path.endsWith('.webp'), asset.path).toBe(true);
       expect(() => readdirSync(path.dirname(path.join('public', asset.path)))).not.toThrow();
@@ -44,6 +46,42 @@ describe('production assets', () => {
   it('contains no raw PNG or JPEG files in the public runtime tree', () => {
     const rawImages = walk('public').filter((file) => /\.(png|jpe?g)$/i.test(file));
     expect(rawImages).toEqual([]);
+  });
+
+  it('preserves menu dimensions and real alpha on every cutout', async () => {
+    const expectedDimensions: Record<string, [number, number]> = {
+      menu_cafe_background: [1600, 900],
+      menu_display_foreground: [910, 540],
+      dunya_neutral: [1024, 1536],
+      dunya_blink: [1024, 1536],
+      dunya_speaking: [1024, 1536],
+      dunya_delighted: [1024, 1536],
+      dunya_focused: [1024, 1536],
+      menu_button_normal: [768, 256],
+      menu_button_hover: [768, 256],
+      menu_button_pressed: [768, 256],
+    };
+    const cutoutKeys = new Set([
+      'dunya_neutral',
+      'dunya_blink',
+      'dunya_speaking',
+      'dunya_delighted',
+      'dunya_focused',
+      'menu_button_normal',
+      'menu_button_hover',
+      'menu_button_pressed',
+    ]);
+
+    for (const asset of menuAssets) {
+      const image = sharp(path.join('public', asset.path));
+      const metadata = await image.metadata();
+      const stats = await image.stats();
+      expect([metadata.width, metadata.height], asset.key).toEqual(expectedDimensions[asset.key]);
+      if (cutoutKeys.has(asset.key)) {
+        expect(metadata.hasAlpha, asset.key).toBe(true);
+        expect(stats.isOpaque, asset.key).toBe(false);
+      }
+    }
   });
 
   it('registers four compressed music tracks that exist', () => {

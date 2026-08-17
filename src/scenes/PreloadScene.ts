@@ -4,6 +4,7 @@ import { I18nService } from '../i18n/I18nService';
 import {
   clueAssets,
   environmentAssets,
+  menuAssets,
   musicAssets,
   pieceAssets,
   soundAssets,
@@ -37,7 +38,7 @@ export class PreloadScene extends Phaser.Scene {
       title.setText(i18n.t('preload.ready'));
     });
 
-    [...pieceAssets, ...clueAssets, ...environmentAssets].forEach(({ key, path }) =>
+    [...pieceAssets, ...clueAssets, ...environmentAssets, ...menuAssets].forEach(({ key, path }) =>
       this.load.image(key, path),
     );
     Object.values(soundAssets).forEach(({ key, path }) => this.load.audio(key, path));
@@ -46,6 +47,6 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.scene.start('PuzzleScene');
+    this.scene.start('MenuScene');
   }
 }

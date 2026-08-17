@@ -20,6 +20,14 @@ const jobs = [
     target: path.join(publicAssets, 'ui'),
   },
   {
+    source: path.join(artSources, 'user-assets', 'menu'),
+    target: path.join(publicAssets, 'menu'),
+  },
+  {
+    source: path.join(artSources, 'user-assets', 'characters'),
+    target: path.join(publicAssets, 'characters'),
+  },
+  {
     source: path.join(artSources, 'runtime-sources', 'environment'),
     target: path.join(publicAssets, 'environment'),
     include: new Set(['gameplay_plate.png']),

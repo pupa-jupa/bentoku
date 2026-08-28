@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BENTO_HOLDER_CENTERS,
   BENTO_HOLDER_SIZE,
+  CLUE_CONTENT_OFFSET_X,
+  CLUE_DIVIDER_Y,
   PLACED_SHELL_SIZE,
   TRAY_HOLDER_CENTERS,
 } from '../src/game/gameplayLayout';
@@ -38,5 +40,10 @@ describe('approved gameplay background anchors', () => {
     ]);
     expect(BENTO_HOLDER_SIZE).toBe(136);
     expect(PLACED_SHELL_SIZE).toBe(138);
+  });
+
+  it('uses one optical center and a raised divider for every clue group', () => {
+    expect(CLUE_CONTENT_OFFSET_X).toBe(-24);
+    expect(CLUE_DIVIDER_Y).toBe(-82);
   });
 });

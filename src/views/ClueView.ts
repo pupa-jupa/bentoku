@@ -27,8 +27,6 @@ export class ClueView extends Phaser.GameObjects.Container {
     const card = scene.add.graphics();
     card.fillStyle(isAnchor ? 0xf3f1d9 : COLORS.milk, isAnchor ? 0.72 : 0.67);
     card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-    card.lineStyle(2, COLORS.ink, 0.15);
-    card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
     this.add(card);
 
     const originX = -gridWidth / 2;

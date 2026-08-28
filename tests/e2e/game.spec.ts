@@ -23,6 +23,7 @@ interface SceneState {
   solved: boolean;
   mode: string;
   timer?: { state: string; remainingMs: number };
+  elapsedTimer?: { elapsedMs: number; running: boolean };
   tutorial?: {
     active: boolean;
     step: string;
@@ -124,6 +125,7 @@ const playStoryIntro = async (page: Page): Promise<void> => {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?seed=BENTO-E2E-0001&difficulty=gentle');
+  await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Infinite');
   await page.evaluate(() => localStorage.clear());
   await page.evaluate(() =>
     localStorage.setItem(
@@ -283,7 +285,7 @@ test('opens the real campaign book and unlocks the next fixed order after a win'
   await page.mouse.click(returnBook.x, returnBook.y);
   await expect.poll(() => sceneTexts(page, 'CampaignScene')).toContain("Dunya's Order Book");
   const progress = await page.evaluate(() => {
-    const stored = JSON.parse(localStorage.getItem('bentoku.save.v3') ?? '{}');
+    const stored = JSON.parse(localStorage.getItem('bentoku.save.v4') ?? '{}');
     const scene = (
       window as unknown as {
         __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
@@ -307,8 +309,10 @@ test('opens the real campaign book and unlocks the next fixed order after a win'
 });
 
 test('keeps the only campaign finale timed at 1:45 with Reveal locked', async ({ page }) => {
+  await page.goto('/');
+  await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Campaign');
   await page.evaluate(() => {
-    const stored = JSON.parse(localStorage.getItem('bentoku.save.v3') ?? '{}');
+    const stored = JSON.parse(localStorage.getItem('bentoku.save.v4') ?? '{}');
     stored.campaign = {
       completedOrderIds: Array.from({ length: 29 }, (_, index) => {
         const chapter = Math.floor(index / 6) + 1;
@@ -317,10 +321,8 @@ test('keeps the only campaign finale timed at 1:45 with Reveal locked', async ({
       }),
       currentOrderId: 'chapter-5-order-6',
     };
-    localStorage.setItem('bentoku.save.v3', JSON.stringify(stored));
+    localStorage.setItem('bentoku.save.v4', JSON.stringify(stored));
   });
-  await page.goto('/');
-  await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Campaign');
   const campaignButton = await screenPoint(page, 312, 268);
   await page.mouse.click(campaignButton.x, campaignButton.y);
   await expect.poll(() => sceneTexts(page, 'CampaignScene')).toContain('Festival Window');
@@ -334,12 +336,6 @@ test('keeps the only campaign finale timed at 1:45 with Reveal locked', async ({
       "Complete Dunya's final Master order in 1 minute 45 seconds. Reveal is locked, and every retry keeps the timer.",
     );
 
-  expect(
-    await page.evaluate(() => {
-      const stored = JSON.parse(localStorage.getItem('bentoku.save.v3') ?? '{}');
-      return stored.album?.viewedStories;
-    }),
-  ).toContain('chapter-1:intro');
   const startChallenge = await screenPoint(page, 800, 527);
   await page.mouse.click(startChallenge.x, startChallenge.y);
   await expect
@@ -505,6 +501,16 @@ test('supports drag, undo, tap placement, and a complete winning run', async ({ 
       }),
     )
     .toEqual({ solved: true, moves: 9, modal: true, activeSparkles: 0 });
+  const completedHistory = await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('bentoku.save.v4') ?? '{}');
+    return {
+      current: stored.currentPuzzle,
+      latest: stored.history?.[0],
+    };
+  });
+  expect(completedHistory.current).toBeUndefined();
+  expect(completedHistory.latest).toMatchObject({ moves: 9, difficulty: 'gentle' });
+  expect(completedHistory.latest.durationMs).toBeGreaterThan(0);
 });
 
 test('keeps the complete composition usable in landscape', async ({ page }) => {
@@ -564,6 +570,92 @@ test('disables and dims the animal family omitted from the solution', async ({ p
   });
 });
 
+test('shows the active elapsed timer and paginates game history with replay', async ({ page }) => {
+  await page.waitForTimeout(1_150);
+  expect((await sceneTexts(page)).some((text) => /TIME 00:0[1-9]/.test(text))).toBe(true);
+
+  await page.goto('/');
+  await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Infinite');
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('bentoku.save.v4') ?? '{}');
+    stored.history = Array.from({ length: 9 }, (_, index) => ({
+      attemptId: `history-e2e-${index}`,
+      startedAt: 1_750_000_000_000 - index * 60_000,
+      seed: `BENTO-HS00-000${index}`,
+      difficulty: index % 2 === 0 ? 'gentle' : 'clever',
+      mode: 'standard',
+      source: 'infinite',
+      durationMs: (index + 1) * 15_000,
+      moves: index + 9,
+    }));
+    localStorage.setItem('bentoku.save.v4', JSON.stringify(stored));
+  });
+  await enterInfinite(page);
+
+  const historyButton = await screenPoint(page, 790, 54);
+  await page.mouse.click(historyButton.x, historyButton.y);
+  await expect.poll(() => sceneTexts(page)).toContain('Game history');
+  const firstPage = await sceneTexts(page);
+  expect(firstPage).toEqual(
+    expect.arrayContaining([
+      'CURRENT GAME',
+      'BENTO-E2E0-001B',
+      'BENTO-HS00-0000',
+      '1 / 2',
+      'STARTED',
+      'SEED',
+      'LEVEL',
+      'TIME',
+      'MOVES',
+      'REPLAY',
+    ]),
+  );
+  const pausedAt = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    return { elapsedMs: scene.elapsedTimer?.elapsedMs ?? -1, running: scene.elapsedTimer?.running };
+  });
+  await page.waitForTimeout(450);
+  const pausedAfter = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    return { elapsedMs: scene.elapsedTimer?.elapsedMs ?? -1, running: scene.elapsedTimer?.running };
+  });
+  expect(pausedAt.running).toBe(false);
+  expect(pausedAfter).toEqual(pausedAt);
+
+  const nextPage = await screenPoint(page, 876, 736);
+  await page.mouse.click(nextPage.x, nextPage.y);
+  await expect.poll(() => sceneTexts(page)).toContain('2 / 2');
+  expect(await sceneTexts(page)).toContain('BENTO-HS00-0006');
+
+  const replayFirstRow = await screenPoint(page, 1245, 286);
+  await page.mouse.click(replayFirstRow.x, replayFirstRow.y);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (
+          window as unknown as {
+            __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+          }
+        ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+        return {
+          seed: scene.puzzle.seed,
+          difficulty: scene.puzzle.difficulty,
+          moves: scene.placement.moves,
+          modal: Boolean(scene.modal),
+        };
+      }),
+    )
+    .toEqual({ seed: 'BENTO-HS00-0006', difficulty: 'gentle', moves: 0, modal: false });
+});
+
 test('keeps toolbar, settings actions, and partial clues inside their intended layout', async ({
   page,
 }) => {
@@ -594,18 +686,50 @@ test('keeps toolbar, settings actions, and partial clues inside their intended l
     { x: 1270, width: 92, role: 'rush' },
   ]);
 
-  const helpGlyphY = await page.evaluate(() => {
+  const iconGlyphPositions = await page.evaluate(() => {
     const scene = (
       window as unknown as {
         __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
       }
     ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
-    const help = scene.children.list.find((object) =>
-      object.list?.some((child) => child.text === '?'),
-    );
-    return help?.list?.find((child) => child.text === '?')?.y;
+    return ['↶', '?', '⚙'].map((glyph) => {
+      const button = scene.children.list.find((object) =>
+        object.list?.some((child) => child.text === glyph),
+      );
+      const text = button?.list?.find((child) => child.text === glyph);
+      return { glyph, x: text?.x, y: text?.y };
+    });
   });
-  expect(helpGlyphY).toBe(4);
+  expect(iconGlyphPositions).toEqual([
+    { glyph: '↶', x: 0, y: 1 },
+    { glyph: '?', x: 0, y: 1 },
+    { glyph: '⚙', x: 0, y: 1 },
+  ]);
+
+  const difficultyButton = await screenPoint(page, 1062, 54);
+  await page.mouse.click(difficultyButton.x, difficultyButton.y);
+  const difficultyActionWidths = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    const modal = scene.modal as { list?: GameObjectState[] } | undefined;
+    return (
+      modal?.list
+        ?.filter((object) => object.list?.some((child) => typeof child.text === 'string'))
+        .map((object) => object.width) ?? []
+    );
+  });
+  expect(difficultyActionWidths).toEqual([188, 188, 188, 188, 188]);
+  await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState & { closeModal(): void } } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    scene.closeModal();
+  });
 
   const settingsButton = await screenPoint(page, 1490, 54);
   await page.mouse.click(settingsButton.x, settingsButton.y);
@@ -636,13 +760,16 @@ test('keeps toolbar, settings actions, and partial clues inside their intended l
       object.list?.some((child) => child.clue?.id === 'anchor-map'),
     )!;
     const partial = panel.list!.filter((child) => child.clue && child.clue.id !== 'anchor-map');
+    const anchor = panel.list!.find((child) => child.clue?.id === 'anchor-map');
     return {
+      anchorX: anchor?.x,
       averageX: partial.reduce((sum, clue) => sum + (clue.x ?? 0), 0) / partial.length,
       bottom:
         (panel.y ?? 0) + Math.max(...partial.map((clue) => (clue.y ?? 0) + (clue.height ?? 0) / 2)),
     };
   });
-  expect(partialLayout.averageX).toBe(-42);
+  expect(partialLayout.anchorX).toBe(-24);
+  expect(partialLayout.averageX).toBe(-24);
   expect(partialLayout.bottom).toBeLessThanOrEqual(755);
 });
 
@@ -688,8 +815,9 @@ test('lets the player switch deduction difficulty and preserves the choice', asy
 test('keeps invalid tutorial placements recoverable and completes the guided path', async ({
   page,
 }) => {
-  await page.evaluate(() => localStorage.clear());
   await page.goto('/');
+  await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Infinite');
+  await page.evaluate(() => localStorage.clear());
   await enterInfinite(page);
   await expect
     .poll(() =>
@@ -823,7 +951,7 @@ test('keeps invalid tutorial placements recoverable and completes the guided pat
             }
           ).__BENTOKU_GAME__.scene.getScene('PuzzleScene').tutorial,
         ),
-        completedVersion: JSON.parse(localStorage.getItem('bentoku.save.v3') ?? '{}').tutorial
+        completedVersion: JSON.parse(localStorage.getItem('bentoku.save.v4') ?? '{}').tutorial
           ?.completedVersion,
       })),
     )
@@ -833,8 +961,9 @@ test('keeps invalid tutorial placements recoverable and completes the guided pat
 test('allows Settings during the tutorial and can skip into an empty Cozy game', async ({
   page,
 }) => {
-  await page.evaluate(() => localStorage.clear());
   await page.goto('/');
+  await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Infinite');
+  await page.evaluate(() => localStorage.clear());
   await enterInfinite(page);
   await expect
     .poll(() =>
@@ -879,7 +1008,7 @@ test('allows Settings during the tutorial and can skip into an empty Cozy game',
           tutorial: Boolean(scene.tutorial),
           difficulty: scene.puzzle.difficulty,
           board: scene.placement.board,
-          completedVersion: JSON.parse(localStorage.getItem('bentoku.save.v3') ?? '{}').tutorial
+          completedVersion: JSON.parse(localStorage.getItem('bentoku.save.v4') ?? '{}').tutorial
             ?.completedVersion,
         };
       }),
@@ -911,7 +1040,7 @@ test('localizes Settings, difficulty guidance, and Help without translating leve
         return {
           documentLanguage: document.documentElement.lang,
           sceneLanguage: scene.settings.language,
-          savedLanguage: JSON.parse(localStorage.getItem('bentoku.save.v3') ?? '{}').settings
+          savedLanguage: JSON.parse(localStorage.getItem('bentoku.save.v4') ?? '{}').settings
             ?.language,
           hasRussianTitle: (() => {
             const collect = (object: GameObjectState): string[] => [

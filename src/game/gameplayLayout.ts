@@ -36,3 +36,5 @@ export const BENTO_HOLDER_CENTERS: readonly GameplayAnchor[] = [
 
 export const BENTO_HOLDER_SIZE = 136;
 export const PLACED_SHELL_SIZE = 138;
+export const CLUE_CONTENT_OFFSET_X = -24;
+export const CLUE_DIVIDER_Y = -82;

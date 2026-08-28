@@ -12,37 +12,50 @@ import {
   emptyBoard,
   toBoard,
   type Difficulty,
+  type GameHistoryEntry,
   type GameMode,
+  type GameSource,
   type Language,
   type PlayerSettings,
   type SaveData,
+  type SavedPuzzleAttempt,
 } from '../puzzle/types';
 
-const STORAGE_KEY = 'bentoku.save.v3';
+const STORAGE_KEY = 'bentoku.save.v4';
+const VERSION_3_STORAGE_KEY = 'bentoku.save.v3';
 const VERSION_2_STORAGE_KEY = 'bentoku.save.v2';
 const VERSION_1_STORAGE_KEY = 'bentoku.save.v1';
 const DEFAULT_SOUND_VOLUME = 1;
 const DEFAULT_MUSIC_VOLUME = 0.5;
 const AUDIO_DEFAULTS_VERSION = 1;
 export const TUTORIAL_VERSION = 1;
+export const MAX_GAME_HISTORY_ENTRIES = 100;
 
 const clampVolume = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;
 
 const parseLanguage = (value: unknown): Language => (value === 'ru' ? 'ru' : 'en');
 const parseMode = (value: unknown): GameMode => (value === 'timed' ? 'timed' : 'standard');
-const parseSource = (
-  value: unknown,
-  fallback: 'infinite' | 'rush' = 'infinite',
-): 'infinite' | 'campaign' | 'rush' =>
+const parseSource = (value: unknown, fallback: 'infinite' | 'rush' = 'infinite'): GameSource =>
   value === 'campaign' || value === 'rush' || value === 'infinite' ? value : fallback;
 const finiteNonNegative = (value: unknown, fallback = 0): number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
+const finitePositive = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
 const stringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
+let fallbackAttemptSequence = 0;
+const createAttemptId = (): string => {
+  const randomId = globalThis.crypto?.randomUUID?.();
+  if (randomId) return randomId;
+  fallbackAttemptSequence += 1;
+  return `attempt-${Date.now().toString(36)}-${fallbackAttemptSequence.toString(36)}`;
+};
+
 const defaults = (): SaveData => ({
-  version: 3,
+  version: 4,
+  history: [],
   settings: {
     language: 'en',
     audioDefaultsVersion: AUDIO_DEFAULTS_VERSION,
@@ -72,6 +85,37 @@ type StoredRecord = Record<string, unknown>;
 const asRecord = (value: unknown): StoredRecord =>
   value && typeof value === 'object' ? (value as StoredRecord) : {};
 
+const parseHistoryEntry = (value: unknown): GameHistoryEntry | undefined => {
+  const entry = asRecord(value);
+  const difficulty = parseDifficulty(String(entry.difficulty ?? ''));
+  const mode = parseMode(entry.mode);
+  const source = parseSource(entry.source, mode === 'timed' ? 'rush' : 'infinite');
+  const campaignOrderId = isCampaignOrderId(entry.campaignOrderId)
+    ? entry.campaignOrderId
+    : undefined;
+  if (
+    typeof entry.attemptId !== 'string' ||
+    entry.attemptId.length === 0 ||
+    typeof entry.seed !== 'string' ||
+    entry.seed.length === 0 ||
+    !difficulty ||
+    (source === 'campaign' && !campaignOrderId)
+  ) {
+    return undefined;
+  }
+  return {
+    attemptId: entry.attemptId,
+    startedAt: finitePositive(entry.startedAt, Date.now()),
+    seed: entry.seed,
+    difficulty,
+    mode,
+    source,
+    ...(campaignOrderId ? { campaignOrderId } : {}),
+    durationMs: finiteNonNegative(entry.durationMs),
+    moves: finiteNonNegative(entry.moves),
+  };
+};
+
 export class SaveService {
   private data: SaveData;
 
@@ -85,6 +129,7 @@ export class SaveService {
     try {
       const raw =
         localStorage.getItem(STORAGE_KEY) ??
+        localStorage.getItem(VERSION_3_STORAGE_KEY) ??
         localStorage.getItem(VERSION_2_STORAGE_KEY) ??
         localStorage.getItem(VERSION_1_STORAGE_KEY);
       if (!raw) return fallback;
@@ -107,12 +152,19 @@ export class SaveService {
       const currentCampaignOrderId = isCampaignOrderId(current.campaignOrderId)
         ? current.campaignOrderId
         : undefined;
+      const loadedAt = Date.now();
       const currentPuzzle =
         typeof current.seed === 'string' &&
         currentDifficulty &&
         currentBoard?.length === 9 &&
         (currentSource !== 'campaign' || currentCampaignOrderId)
           ? {
+              attemptId:
+                typeof current.attemptId === 'string' && current.attemptId.length > 0
+                  ? current.attemptId
+                  : createAttemptId(),
+              startedAt: finitePositive(current.startedAt, loadedAt),
+              elapsedMs: finiteNonNegative(current.elapsedMs),
               seed: current.seed,
               difficulty: currentDifficulty,
               mode: currentMode,
@@ -122,6 +174,11 @@ export class SaveService {
               moves: finiteNonNegative(current.moves),
             }
           : undefined;
+
+      const history = (Array.isArray(parsed.history) ? parsed.history : [])
+        .map(parseHistoryEntry)
+        .filter((entry): entry is GameHistoryEntry => Boolean(entry))
+        .slice(0, MAX_GAME_HISTORY_ENTRIES);
 
       const completedOrderIds = stringArray(campaign.completedOrderIds).filter(isCampaignOrderId);
       const completedSet = new Set(completedOrderIds);
@@ -140,7 +197,8 @@ export class SaveService {
           : firstIncompleteCampaignOrder(completedSet).id;
 
       return {
-        version: 3,
+        version: 4,
+        history,
         settings: {
           language: parseLanguage(settings.language),
           audioDefaultsVersion: AUDIO_DEFAULTS_VERSION,
@@ -226,6 +284,15 @@ export class SaveService {
     return this.data.currentPuzzle?.campaignOrderId;
   }
 
+  get activeGame(): Readonly<SavedPuzzleAttempt> | undefined {
+    const current = this.data.currentPuzzle;
+    return current ? { ...current, board: toBoard(current.board) } : undefined;
+  }
+
+  get gameHistory(): readonly Readonly<GameHistoryEntry>[] {
+    return this.data.history.map((entry) => ({ ...entry }));
+  }
+
   get tutorialCompleted(): boolean {
     return this.data.tutorial.completedVersion >= TUTORIAL_VERSION;
   }
@@ -253,10 +320,18 @@ export class SaveService {
     difficulty: Difficulty,
     mode: GameMode = 'standard',
     context?: PlayContext,
-  ): { board: ReturnType<typeof emptyBoard>; moves: number } {
+    resume = true,
+  ): {
+    board: ReturnType<typeof emptyBoard>;
+    moves: number;
+    attemptId: string;
+    startedAt: number;
+    elapsedMs: number;
+  } {
     const current = this.data.currentPuzzle;
     const source = context?.source ?? (mode === 'timed' ? 'rush' : 'infinite');
     if (
+      !resume ||
       !current ||
       current.seed !== seed ||
       current.difficulty !== difficulty ||
@@ -264,9 +339,21 @@ export class SaveService {
       current.source !== source ||
       (source === 'campaign' && current.campaignOrderId !== context?.campaignOrderId)
     ) {
-      return { board: emptyBoard(), moves: 0 };
+      return {
+        board: emptyBoard(),
+        moves: 0,
+        attemptId: createAttemptId(),
+        startedAt: Date.now(),
+        elapsedMs: 0,
+      };
     }
-    return { board: toBoard(current.board), moves: current.moves };
+    return {
+      board: toBoard(current.board),
+      moves: current.moves,
+      attemptId: current.attemptId,
+      startedAt: current.startedAt,
+      elapsedMs: current.elapsedMs,
+    };
   }
 
   savePuzzle(
@@ -276,9 +363,29 @@ export class SaveService {
     moves: number,
     mode: GameMode = 'standard',
     context?: PlayContext,
+    timing?: Pick<SavedPuzzleAttempt, 'attemptId' | 'startedAt' | 'elapsedMs'>,
   ): void {
     const source = context?.source ?? (mode === 'timed' ? 'rush' : 'infinite');
+    const current = this.data.currentPuzzle;
+    const sameAttempt =
+      current?.seed === seed &&
+      current.difficulty === difficulty &&
+      current.mode === mode &&
+      current.source === source &&
+      (source !== 'campaign' || current.campaignOrderId === context?.campaignOrderId);
+    const savedTiming =
+      timing ??
+      (sameAttempt && current
+        ? {
+            attemptId: current.attemptId,
+            startedAt: current.startedAt,
+            elapsedMs: current.elapsedMs,
+          }
+        : { attemptId: createAttemptId(), startedAt: Date.now(), elapsedMs: 0 });
     this.data.currentPuzzle = {
+      attemptId: savedTiming.attemptId.length > 0 ? savedTiming.attemptId : createAttemptId(),
+      startedAt: finitePositive(savedTiming.startedAt, Date.now()),
+      elapsedMs: finiteNonNegative(savedTiming.elapsedMs),
       seed,
       difficulty,
       mode,
@@ -287,7 +394,7 @@ export class SaveService {
         ? { campaignOrderId: context.campaignOrderId }
         : {}),
       board: toBoard(board),
-      moves,
+      moves: finiteNonNegative(moves),
     };
     this.persist();
   }
@@ -343,7 +450,30 @@ export class SaveService {
     this.persist();
   }
 
-  markSolved(mode: GameMode = 'standard', remainingMs = 0): void {
+  markSolved(
+    mode: GameMode = 'standard',
+    remainingMs = 0,
+    elapsedMs?: number,
+    moves?: number,
+  ): void {
+    const current = this.data.currentPuzzle;
+    if (current) {
+      const completed: GameHistoryEntry = {
+        attemptId: current.attemptId,
+        startedAt: current.startedAt,
+        seed: current.seed,
+        difficulty: current.difficulty,
+        mode: current.mode,
+        source: current.source,
+        ...(current.campaignOrderId ? { campaignOrderId: current.campaignOrderId } : {}),
+        durationMs: finiteNonNegative(elapsedMs, current.elapsedMs),
+        moves: finiteNonNegative(moves, current.moves),
+      };
+      this.data.history = [
+        completed,
+        ...this.data.history.filter((entry) => entry.attemptId !== completed.attemptId),
+      ].slice(0, MAX_GAME_HISTORY_ENTRIES);
+    }
     this.data.stats.solved += 1;
     if (mode === 'timed') {
       this.data.stats.timed.wins += 1;

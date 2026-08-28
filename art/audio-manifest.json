@@ -41,6 +41,24 @@
         "runtime": "paper_lantern_logic_short.mp3",
         "durationSeconds": 40.92,
         "integratedLufs": -16.4
+      },
+      {
+        "key": "music_light_of_tea",
+        "source": "light of tea.mp3",
+        "sourceSha256": "55E531F825468BFA01CA1CAC10E0CF3CE9EEA787E38F1535BA37BAE511611545",
+        "runtime": "light_of_tea.mp3",
+        "runtimeSha256": "C15334D95974B2935194FA5324701CC95FB0358A28E6D616C5990042544BB324",
+        "durationSeconds": 59.86,
+        "integratedLufs": -16.5
+      },
+      {
+        "key": "music_pearl_arcade",
+        "source": "Pearl Arcade.mp3",
+        "sourceSha256": "B8102B52AF5D2FD1EBFC1DDFFA6753C7CF7E9E7D5733D89FFD81071510E207BA",
+        "runtime": "pearl_arcade.mp3",
+        "runtimeSha256": "3DB237DF715B91ABBFA00FDE508D70AD062480451E518FCEEC04036C4E2E0992",
+        "durationSeconds": 215.04,
+        "integratedLufs": -16.48
       }
     ],
     "duplicatesOmitted": [

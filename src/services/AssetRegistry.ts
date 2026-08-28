@@ -70,4 +70,6 @@ export const musicAssets: AssetEntry[] = [
     key: 'music_paper_lantern_logic_short',
     path: 'assets/music/paper_lantern_logic_short.mp3',
   },
+  { key: 'music_light_of_tea', path: 'assets/music/light_of_tea.mp3' },
+  { key: 'music_pearl_arcade', path: 'assets/music/pearl_arcade.mp3' },
 ];

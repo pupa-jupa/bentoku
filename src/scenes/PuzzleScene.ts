@@ -2,12 +2,18 @@ import Phaser from 'phaser';
 import { getCampaignOrder } from '../campaign/campaignData';
 import { getCampaignStoryForOrder, storyEventId } from '../campaign/storyData';
 import { COLORS, FONT_BODY, FONT_DISPLAY } from '../game/constants';
-import { INFINITE_PLAY_CONTEXT, RUSH_PLAY_CONTEXT, type PlayContext } from '../game/playContext';
+import {
+  campaignPlayContext,
+  INFINITE_PLAY_CONTEXT,
+  RUSH_PLAY_CONTEXT,
+  type PlayContext,
+} from '../game/playContext';
 import {
   ChallengeTimer,
   formatChallengeTime,
   MASTER_CHALLENGE_DURATION_MS,
 } from '../gameplay/ChallengeTimer';
+import { ElapsedTimer, formatElapsedTime } from '../gameplay/ElapsedTimer';
 import { HintController } from '../gameplay/HintController';
 import { PlacementController } from '../gameplay/PlacementController';
 import { PuzzleController } from '../gameplay/PuzzleController';
@@ -22,6 +28,7 @@ import {
   emptyBoard,
   toBoard,
   type Difficulty,
+  type GameHistoryEntry,
   type GameMode,
   type PieceId,
   type PlayerSettings,
@@ -34,6 +41,7 @@ import { SaveService } from '../services/SaveService';
 import { BentoBoard } from '../views/BentoBoard';
 import { CelebrationView } from '../views/CelebrationView';
 import { CluePanel } from '../views/CluePanel';
+import { GameHistoryModal, type HistoryGameRow } from '../views/GameHistoryModal';
 import { InventoryPanel } from '../views/InventoryPanel';
 import { getPieceVisualLayout, PieceView } from '../views/PieceView';
 import { TutorialView, type TutorialHighlight } from '../views/TutorialView';
@@ -46,7 +54,6 @@ interface ButtonSpec {
   callback: () => void;
   primary?: boolean;
   icon?: boolean;
-  textOffsetY?: number;
   sound?: SoundName | false;
   allowDuringTutorial?: boolean;
 }
@@ -99,7 +106,6 @@ export class PuzzleScene extends Phaser.Scene {
   private piecePress?: PiecePress;
   private modal?: Phaser.GameObjects.Container;
   private moveText!: Phaser.GameObjects.Text;
-  private seedText!: Phaser.GameObjects.Text;
   private petalTimer?: Phaser.Time.TimerEvent;
   private solved = false;
   private mode: GameMode = 'standard';
@@ -108,6 +114,11 @@ export class PuzzleScene extends Phaser.Scene {
   private undoButton?: Phaser.GameObjects.Container;
   private timer?: ChallengeTimer;
   private timerText?: Phaser.GameObjects.Text;
+  private elapsedTimer = new ElapsedTimer();
+  private attemptId = '';
+  private attemptStartedAt = 0;
+  private lastElapsedDisplaySecond = -1;
+  private lastElapsedPersistedBucket = -1;
   private timedOut = false;
   private countdown?: Phaser.GameObjects.Container;
   private visibilityHandler?: () => void;
@@ -185,12 +196,15 @@ export class PuzzleScene extends Phaser.Scene {
     this.visibilityHandler = () => this.handleVisibilityChange();
     document.addEventListener('visibilitychange', this.visibilityHandler);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.elapsedTimer.pause();
+      if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
         document.removeEventListener('visibilitychange', this.visibilityHandler);
     });
   }
 
   update(): void {
+    this.updateElapsedDisplay();
     if (this.mode !== 'timed' || !this.timer || this.timedOut || this.solved) return;
     this.updateTimerDisplay();
     if (this.timer.state === 'expired') this.handleTimedOut();
@@ -201,6 +215,7 @@ export class PuzzleScene extends Phaser.Scene {
     difficulty: Difficulty = this.settings.difficulty,
     mode: GameMode = 'standard',
     context: PlayContext = mode === 'timed' ? RUSH_PLAY_CONTEXT : INFINITE_PLAY_CONTEXT,
+    resume = true,
   ): void {
     this.mode = mode;
     this.playContext = context;
@@ -214,14 +229,22 @@ export class PuzzleScene extends Phaser.Scene {
       this.puzzle.solution.filter((pieceId): pieceId is PieceId => pieceId !== null),
     );
     this.puzzleController = new PuzzleController(this.puzzle);
-    const saved =
-      mode === 'timed'
-        ? { board: emptyBoard(), moves: 0 }
-        : this.save.loadPuzzle(this.puzzle.seed, this.puzzle.difficulty, mode, context);
+    const saved = this.save.loadPuzzle(
+      this.puzzle.seed,
+      this.puzzle.difficulty,
+      mode,
+      context,
+      resume && mode !== 'timed',
+    );
     const playableBoard = toBoard(
       saved.board.map((pieceId) => (pieceId && this.usablePieceIds.has(pieceId) ? pieceId : null)),
     );
     this.placement = new PlacementController(playableBoard, saved.moves);
+    this.attemptId = saved.attemptId;
+    this.attemptStartedAt = saved.startedAt;
+    this.elapsedTimer = new ElapsedTimer(saved.elapsedMs);
+    this.lastElapsedDisplaySecond = -1;
+    this.lastElapsedPersistedBucket = Math.floor(saved.elapsedMs / 5_000);
     this.selectedPiece = null;
     this.solved = false;
     this.timedOut = false;
@@ -230,6 +253,7 @@ export class PuzzleScene extends Phaser.Scene {
         ? new ChallengeTimer(context.durationMs ?? MASTER_CHALLENGE_DURATION_MS)
         : undefined;
     this.renderScene();
+    if (mode === 'standard' && !document.hidden) this.elapsedTimer.resume();
     this.saveCurrent();
     this.syncUrl();
   }
@@ -283,31 +307,14 @@ export class PuzzleScene extends Phaser.Scene {
       slot.on('pointerdown', () => this.activateSlot(slot.index));
     });
 
-    this.seedText = this.add
-      .text(
-        790,
-        54,
-        this.playContext.source === 'campaign' && this.playContext.campaignOrderId
-          ? this.localizedI18n.t('campaign.order', {
-              order: getCampaignOrder(this.playContext.campaignOrderId).order,
-            })
-          : this.puzzle.seed,
-        {
-          fontFamily: FONT_BODY,
-          fontSize: '17px',
-          fontStyle: 'bold',
-          color: '#74594f',
-          backgroundColor: '#fff8e9aa',
-          padding: { x: 16, y: 9 },
-        },
-      )
-      .setOrigin(0.5);
-    if (this.playContext.source !== 'campaign') {
-      this.seedText.setInteractive({ useHandCursor: true });
-      this.seedText.on('pointerdown', () => void this.copySeed());
-      this.seedText.on('pointerover', () => this.seedText.setColor('#c66f69'));
-      this.seedText.on('pointerout', () => this.seedText.setColor('#74594f'));
-    }
+    this.makeButton({
+      x: 790,
+      y: 54,
+      width: 144,
+      label: this.localizedI18n.t('button.history'),
+      callback: () => this.openGameHistory(),
+      sound: false,
+    });
 
     this.makeButton({
       x: 1062,
@@ -357,7 +364,6 @@ export class PuzzleScene extends Phaser.Scene {
       label: '?',
       callback: () => this.openHelp(),
       icon: true,
-      textOffsetY: 4,
       sound: false,
     });
     this.makeButton({
@@ -613,11 +619,15 @@ export class PuzzleScene extends Phaser.Scene {
 
   private updateStatus(): void {
     const filled = this.placement.board.filter(Boolean).length;
+    const status = this.i18n.t('status.template', {
+      filled,
+      moves: this.i18n.moves(this.placement.moves),
+      finished: this.i18n.finished(this.save.solvedCount),
+    });
     this.moveText.setText(
-      this.i18n.t('status.template', {
-        filled,
-        moves: this.i18n.moves(this.placement.moves),
-        finished: this.i18n.finished(this.save.solvedCount),
+      this.i18n.t('status.elapsed', {
+        status,
+        time: formatElapsedTime(this.elapsedTimer.elapsedMs),
       }),
     );
   }
@@ -647,7 +657,14 @@ export class PuzzleScene extends Phaser.Scene {
     this.solved = true;
     const remainingMs = this.timer?.remainingMs ?? 0;
     this.timer?.pause();
-    this.save.markSolved(this.playContext.source === 'rush' ? 'timed' : 'standard', remainingMs);
+    this.elapsedTimer.pause();
+    const elapsedMs = this.elapsedTimer.elapsedMs;
+    this.save.markSolved(
+      this.playContext.source === 'rush' ? 'timed' : 'standard',
+      remainingMs,
+      elapsedMs,
+      this.placement.moves,
+    );
     if (this.playContext.source === 'campaign' && this.playContext.campaignOrderId) {
       this.save.completeCampaignOrder(this.playContext.campaignOrderId);
     }
@@ -692,7 +709,7 @@ export class PuzzleScene extends Phaser.Scene {
           } else if (this.mode === 'timed') this.startTimedChallenge(createRandomSeed());
           else this.startRandom();
         },
-        () => void this.copySeed(),
+        () => void this.copyGameSeed(this.puzzle.seed, this.puzzle.difficulty),
         this.playContext.source === 'campaign'
           ? this.localizedI18n.t('campaign.completeBody')
           : this.mode === 'timed'
@@ -793,9 +810,9 @@ export class PuzzleScene extends Phaser.Scene {
           .setDisplaySize(spec.icon ? 55 : spec.width + 6, spec.icon ? 55 : 54)
       : this.createButtonFallback(spec, height);
     const text = this.add
-      .text(0, spec.textOffsetY ?? (spec.icon ? -1 : 0), spec.label, {
-        fontFamily: FONT_BODY,
-        fontSize: spec.icon ? '24px' : '16px',
+      .text(0, spec.icon ? 1 : 0, spec.label, {
+        fontFamily: spec.icon ? 'Arial, sans-serif' : FONT_BODY,
+        fontSize: spec.icon ? '23px' : '16px',
         fontStyle: 'bold',
         color: spec.primary ? '#fffaf3' : '#695149',
       })
@@ -913,6 +930,18 @@ export class PuzzleScene extends Phaser.Scene {
           callback: () => {
             this.closeModal();
             this.placement.restart();
+            const fresh = this.save.loadPuzzle(
+              this.puzzle.seed,
+              this.puzzle.difficulty,
+              this.mode,
+              this.playContext,
+              false,
+            );
+            this.attemptId = fresh.attemptId;
+            this.attemptStartedAt = fresh.startedAt;
+            this.elapsedTimer.reset(0, !document.hidden && this.canPlay());
+            this.lastElapsedDisplaySecond = -1;
+            this.lastElapsedPersistedBucket = 0;
             this.updatePiecePositions(true);
             this.updateStatus();
             this.saveCurrent();
@@ -979,6 +1008,9 @@ export class PuzzleScene extends Phaser.Scene {
         callback: () => this.switchDifficulty(difficulty),
         primary: difficulty === this.puzzle.difficulty,
       })),
+      undefined,
+      true,
+      { actionWidth: 188 },
     );
     this.audio.play('note_open');
   }
@@ -1011,7 +1043,8 @@ export class PuzzleScene extends Phaser.Scene {
     dismissible = true,
     layout: ModalLayoutSpec = {},
   ): void {
-    this.closeModal();
+    this.closeModal(false);
+    this.pauseElapsedTracking();
     const modal = this.add.container(800, 450).setDepth(this.tutorial?.active ? 5000 : 2600);
     const shade = this.add.rectangle(0, 0, 1600, 900, COLORS.walnut, 0.26).setInteractive();
     const card = this.add.graphics();
@@ -1203,10 +1236,11 @@ export class PuzzleScene extends Phaser.Scene {
     parent.add([label, visual, zone]);
   }
 
-  private closeModal(): void {
+  private closeModal(resumeElapsed = true): void {
     if (!this.modal) return;
     this.modal.destroy(true);
     this.modal = undefined;
+    if (resumeElapsed) this.resumeElapsedTracking();
   }
 
   private startRandom(): void {
@@ -1221,23 +1255,97 @@ export class PuzzleScene extends Phaser.Scene {
     this.announce(this.i18n.t('announce.daily'));
   }
 
-  private async copySeed(): Promise<void> {
-    if (this.tutorial?.active) return;
+  private openGameHistory(): void {
+    if (this.solved || this.tutorial?.active) return;
+    this.closeModal(false);
+    this.pauseElapsedTracking();
+    const history = new GameHistoryModal(this, this.localizedI18n, {
+      close: () => {
+        this.audio.play('ui_tap');
+        this.closeModal();
+      },
+      copy: (row) => this.copyGameSeed(row.seed, row.difficulty),
+      replay: (row) => this.replayHistoryGame(row),
+    });
+    history.refresh(this.historyRows());
+    this.modal = history;
+    this.audio.play('note_open');
+  }
+
+  private historyRows(): HistoryGameRow[] {
+    const active = this.save.activeGame;
+    const current = active
+      ? [
+          {
+            attemptId: active.attemptId,
+            startedAt: active.startedAt,
+            seed: active.seed,
+            difficulty: active.difficulty,
+            mode: active.mode,
+            source: active.source,
+            ...(active.campaignOrderId ? { campaignOrderId: active.campaignOrderId } : {}),
+            durationMs:
+              active.attemptId === this.attemptId ? this.elapsedTimer.elapsedMs : active.elapsedMs,
+            moves: active.attemptId === this.attemptId ? this.placement.moves : active.moves,
+            current: true,
+          } satisfies HistoryGameRow,
+        ]
+      : [];
+    return [
+      ...current,
+      ...this.save.gameHistory.map((entry): HistoryGameRow => ({
+        ...(entry as GameHistoryEntry),
+        current: false,
+      })),
+    ];
+  }
+
+  private replayHistoryGame(row: HistoryGameRow): void {
     this.audio.play('ui_tap');
-    const url = new URL(window.location.href);
-    url.searchParams.set('seed', this.puzzle.seed);
-    url.searchParams.set('difficulty', difficultySlug(this.puzzle.difficulty));
+    this.closeModal(false);
+    if (row.source === 'campaign' && row.campaignOrderId) {
+      const order = getCampaignOrder(row.campaignOrderId);
+      const context = campaignPlayContext(order.id, order.timed, order.durationMs);
+      this.createPuzzle(
+        row.seed,
+        row.difficulty,
+        order.timed ? 'timed' : 'standard',
+        context,
+        false,
+      );
+      if (order.timed) this.openCampaignTimedRules();
+      else this.announce(this.i18n.t('announce.ready'));
+      return;
+    }
+
+    if (row.source === 'rush' || row.mode === 'timed') {
+      this.createPuzzle(row.seed, row.difficulty, 'timed', RUSH_PLAY_CONTEXT, false);
+      this.openTimedChallengeRules(false);
+      return;
+    }
+
+    this.createPuzzle(row.seed, row.difficulty, 'standard', INFINITE_PLAY_CONTEXT, false);
+    this.announce(this.i18n.t('announce.ready'));
+  }
+
+  private async copyGameSeed(seed: string, difficulty: Difficulty): Promise<boolean> {
+    if (this.tutorial?.active) return false;
+    this.audio.play('ui_tap');
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.searchParams.set('seed', seed);
+    url.searchParams.set('difficulty', difficultySlug(difficulty));
     try {
       await navigator.clipboard.writeText(url.toString());
-      this.seedText?.setText(this.i18n.t('share.copied'));
-      this.time.delayedCall(1500, () => this.seedText?.setText(this.puzzle.seed));
       this.announce(this.i18n.t('announce.copied'));
+      return true;
     } catch {
-      this.announce(this.i18n.t('announce.shareSeed', { seed: this.puzzle.seed }));
+      this.announce(this.i18n.t('announce.shareSeed', { seed }));
+      return false;
     }
   }
 
   private saveCurrent(): void {
+    if (!this.puzzle || !this.placement || !this.attemptId) return;
     this.save.savePuzzle(
       this.puzzle.seed,
       this.puzzle.difficulty,
@@ -1245,7 +1353,36 @@ export class PuzzleScene extends Phaser.Scene {
       this.placement.moves,
       this.mode,
       this.playContext,
+      {
+        attemptId: this.attemptId,
+        startedAt: this.attemptStartedAt,
+        elapsedMs: this.elapsedTimer.elapsedMs,
+      },
     );
+  }
+
+  private updateElapsedDisplay(): void {
+    if (!this.moveText || !this.elapsedTimer) return;
+    const elapsedMs = this.elapsedTimer.elapsedMs;
+    const elapsedSecond = Math.floor(elapsedMs / 1_000);
+    if (elapsedSecond === this.lastElapsedDisplaySecond) return;
+    this.lastElapsedDisplaySecond = elapsedSecond;
+    this.updateStatus();
+    const persistedBucket = Math.floor(elapsedMs / 5_000);
+    if (this.elapsedTimer.running && persistedBucket > this.lastElapsedPersistedBucket) {
+      this.lastElapsedPersistedBucket = persistedBucket;
+      this.saveCurrent();
+    }
+  }
+
+  private pauseElapsedTracking(): void {
+    if (this.elapsedTimer.pause()) this.saveCurrent();
+  }
+
+  private resumeElapsedTracking(): void {
+    if (document.hidden || this.modal || this.countdown || this.solved || this.timedOut) return;
+    if (this.mode === 'timed' && this.timer?.state !== 'running') return;
+    this.elapsedTimer.resume();
   }
 
   private syncUrl(): void {
@@ -1451,6 +1588,7 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private startCountdown(onComplete: () => void): void {
+    this.pauseElapsedTracking();
     this.countdown?.destroy(true);
     const overlay = this.add.container(0, 0).setDepth(5000);
     const shade = this.add.rectangle(800, 450, 1600, 900, COLORS.walnut, 0.28).setInteractive();
@@ -1498,6 +1636,7 @@ export class PuzzleScene extends Phaser.Scene {
         overlay.destroy(true);
         this.countdown = undefined;
         onComplete();
+        this.resumeElapsedTracking();
       },
     });
   }
@@ -1516,6 +1655,7 @@ export class PuzzleScene extends Phaser.Scene {
   private handleTimedOut(): void {
     if (this.timedOut || this.solved) return;
     this.timedOut = true;
+    this.pauseElapsedTracking();
     this.audio.play('board_incorrect');
     const actions =
       this.playContext.source === 'campaign'
@@ -1549,12 +1689,19 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private handleVisibilityChange(): void {
-    if (this.mode !== 'timed' || !this.timer || this.timedOut || this.solved) return;
     if (document.hidden) {
-      this.timer.pause();
+      this.pauseElapsedTracking();
+      if (this.mode === 'timed' && this.timer && !this.timedOut && !this.solved) {
+        this.timer.pause();
+      }
       return;
     }
-    if (this.timer.state === 'paused') this.startCountdown(() => this.timer?.resume());
+    if (this.solved || this.timedOut || this.modal || this.countdown) return;
+    if (this.mode === 'timed' && this.timer?.state === 'paused') {
+      this.startCountdown(() => this.timer?.resume());
+      return;
+    }
+    this.resumeElapsedTracking();
   }
 
   private announce(message: string): void {

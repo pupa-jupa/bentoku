@@ -30,7 +30,7 @@ describe('localization and save migration', () => {
   it('uses English by default and persists an explicit Russian choice', () => {
     const first = new SaveService();
     expect(first.settings).toMatchObject({ language: 'en', musicVolume: 0.5 });
-    expect(JSON.parse(storage.getItem('bentoku.save.v3') ?? '{}').version).toBe(3);
+    expect(JSON.parse(storage.getItem('bentoku.save.v4') ?? '{}').version).toBe(4);
     first.updateSettings({ language: 'ru' });
     expect(new SaveService().settings.language).toBe('ru');
   });
@@ -107,12 +107,12 @@ describe('localization and save migration', () => {
     expect(migrated.selectedCampaignOrderId).toBe('chapter-1-order-1');
     expect(migrated.completedCampaignOrderIds).toEqual([]);
 
-    const stored = JSON.parse(storage.getItem('bentoku.save.v3') ?? '{}');
+    const stored = JSON.parse(storage.getItem('bentoku.save.v4') ?? '{}');
     stored.campaign = {
       completedOrderIds: ['chapter-1-order-1', 'not-a-real-order'],
       currentOrderId: 'also-corrupt',
     };
-    storage.setItem('bentoku.save.v3', JSON.stringify(stored));
+    storage.setItem('bentoku.save.v4', JSON.stringify(stored));
     const recovered = new SaveService();
     expect(recovered.completedCampaignOrderIds).toEqual(['chapter-1-order-1']);
     expect(recovered.selectedCampaignOrderId).toBe('chapter-1-order-2');
@@ -137,9 +137,9 @@ describe('localization and save migration', () => {
     expect(save.hasViewedCampaignStory('chapter-1:intro')).toBe(true);
     expect(new SaveService().viewedCampaignStoryIds).toEqual(['chapter-1:intro']);
 
-    const stored = JSON.parse(storage.getItem('bentoku.save.v3') ?? '{}');
+    const stored = JSON.parse(storage.getItem('bentoku.save.v4') ?? '{}');
     stored.album.viewedStories.push('not-a-story');
-    storage.setItem('bentoku.save.v3', JSON.stringify(stored));
+    storage.setItem('bentoku.save.v4', JSON.stringify(stored));
     expect(new SaveService().viewedCampaignStoryIds).toEqual(['chapter-1:intro']);
   });
 });

@@ -84,8 +84,8 @@ describe('production assets', () => {
     }
   });
 
-  it('registers four compressed music tracks that exist', () => {
-    expect(musicAssets).toHaveLength(4);
+  it('registers six compressed music tracks that exist', () => {
+    expect(musicAssets).toHaveLength(6);
     for (const asset of musicAssets) {
       const file = path.join('public', asset.path);
       expect(asset.path.endsWith('.mp3'), asset.path).toBe(true);

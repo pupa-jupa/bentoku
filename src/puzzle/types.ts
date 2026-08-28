@@ -26,6 +26,7 @@ export type Difficulty = (typeof DIFFICULTIES)[number];
 export type Language = (typeof LANGUAGES)[number];
 export type GameMode = (typeof GAME_MODES)[number];
 export type ClueName = (typeof CLUE_NAMES)[number];
+export type GameSource = 'infinite' | 'campaign' | 'rush';
 
 export interface BentoPiece {
   id: PieceId;
@@ -119,17 +120,35 @@ export interface PlayerSettings {
   mode: GameMode;
 }
 
+export interface SavedPuzzleAttempt {
+  attemptId: string;
+  startedAt: number;
+  elapsedMs: number;
+  seed: string;
+  difficulty: Difficulty;
+  mode: GameMode;
+  source: GameSource;
+  campaignOrderId?: import('../campaign/campaignData').CampaignOrderId;
+  board: Board;
+  moves: number;
+}
+
+export interface GameHistoryEntry {
+  attemptId: string;
+  startedAt: number;
+  seed: string;
+  difficulty: Difficulty;
+  mode: GameMode;
+  source: GameSource;
+  campaignOrderId?: import('../campaign/campaignData').CampaignOrderId;
+  durationMs: number;
+  moves: number;
+}
+
 export interface SaveData {
-  version: 3;
-  currentPuzzle?: {
-    seed: string;
-    difficulty: Difficulty;
-    mode: GameMode;
-    source: 'infinite' | 'campaign' | 'rush';
-    campaignOrderId?: import('../campaign/campaignData').CampaignOrderId;
-    board: Board;
-    moves: number;
-  };
+  version: 4;
+  currentPuzzle?: SavedPuzzleAttempt;
+  history: GameHistoryEntry[];
   settings: PlayerSettings;
   tutorial: {
     completedVersion: number;

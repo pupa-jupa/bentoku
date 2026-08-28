@@ -12,8 +12,10 @@ Bentoku is a finished client-side browser puzzle about arranging nine tiny kawai
 - Choose Cozy, Gentle, Clever, Tricky, or Master from the difficulty button. Every level is deduction-only; higher levels use longer chains instead of guesses. Master leaves at least one café-map cell blank and links five or six substantial sliding sketches.
 - Choose English or Russian in settings. English is the default language.
 - Master Rush adds a 1:45 timer to a fresh Master puzzle. Reveal is disabled, and an expired attempt can only be retried or replaced with a new challenge.
+- Every puzzle shows active solving time beside the move count. The timer pauses while a blocking menu is open or the game is hidden.
 - Set effects and music volume independently in Settings; the Effects switch remains available for quick muting.
-- Click the seed to copy a shareable link. Daily and random bentos work without a backend.
+- Open Game History to review the current attempt and completed games, copy any seed as a shareable link, or replay it. History is paginated and stored locally.
+- Daily and random bentos work without a backend.
 
 ## Development
 
@@ -40,7 +42,7 @@ The 12,500-puzzle suite is part of `pnpm test` and covers all five difficulty le
 - A public-rule exact solver that considers all 12 visible pieces
 - A separate no-assumption deduction solver using constraint propagation, sliding-pattern support, complete-family elimination, and all-different matching
 - Information-gain clue selection and five measured deduction profiles
-- Local persistence, softly synthesized sound effects, and a compressed gently faded BGM playlist
+- Versioned local persistence with game history, softly synthesized sound effects, and a six-track compressed gently faded BGM playlist
 - No backend and no runtime network dependency for game logic or art
 
 The art direction, prompts, source generations, and manifest live under `art/`.

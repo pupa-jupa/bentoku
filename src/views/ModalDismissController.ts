@@ -26,7 +26,7 @@ export const bindModalDismissal = ({
 }: ModalDismissSpec): (() => void) => {
   let active = true;
   const cleanup = (): void => {
-    backdrop.off('pointerup', finish);
+    backdrop.off('pointerdown', finish);
     card.off('pointerdown', stop);
     card.off('pointerup', stop);
     scene.input.keyboard?.off('keydown-ESC', onEscape);
@@ -50,7 +50,7 @@ export const bindModalDismissal = ({
     finish();
   };
 
-  backdrop.on('pointerup', finish);
+  backdrop.on('pointerdown', finish);
   card
     .setInteractive(
       new Phaser.Geom.Rectangle(cardBounds.x, cardBounds.y, cardBounds.width, cardBounds.height),

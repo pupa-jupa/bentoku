@@ -60,6 +60,14 @@ const screenPoint = async (page: Page, x: number, y: number) =>
     { x, y },
   );
 
+const realisticClick = async (page: Page, x: number, y: number): Promise<void> => {
+  const point = await screenPoint(page, x, y);
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.waitForTimeout(120);
+  await page.mouse.up();
+};
+
 const sceneTexts = async (page: Page, sceneKey = 'PuzzleScene'): Promise<string[]> =>
   page.evaluate((key) => {
     const scene = (
@@ -865,6 +873,17 @@ test('dismisses modal surfaces only from outside or Escape', async ({ page }) =>
       ),
     )
     .toBe(false);
+});
+
+test('keeps toolbar modals open after releasing a realistic click', async ({ page }) => {
+  await realisticClick(page, 1490, 54);
+  await expect.poll(() => sceneTexts(page)).toContain('Settings');
+
+  await page.keyboard.press('Escape');
+  await expect.poll(() => sceneTexts(page)).not.toContain('Settings');
+
+  await realisticClick(page, 1062, 54);
+  await expect.poll(() => sceneTexts(page)).toContain('Choose a deduction level');
 });
 
 test('keeps toolbar, settings actions, and partial clues inside their intended layout', async ({

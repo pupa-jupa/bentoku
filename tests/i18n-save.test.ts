@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nService } from '../src/i18n/I18nService';
+import { englishDifficultyLabel } from '../src/i18n/difficultyLabels';
+import { DEFAULT_MUSIC_TRACK_KEY } from '../src/services/AssetRegistry';
 import { SaveService } from '../src/services/SaveService';
 
 class MemoryStorage {
@@ -29,7 +31,12 @@ describe('localization and save migration', () => {
 
   it('uses English by default and persists an explicit Russian choice', () => {
     const first = new SaveService();
-    expect(first.settings).toMatchObject({ language: 'en', musicVolume: 0.5 });
+    expect(first.settings).toMatchObject({
+      language: 'en',
+      musicVolume: 0.5,
+      musicTrackKey: DEFAULT_MUSIC_TRACK_KEY,
+      nightDim: 0,
+    });
     expect(JSON.parse(storage.getItem('bentoku.save.v4') ?? '{}').version).toBe(4);
     first.updateSettings({ language: 'ru' });
     expect(new SaveService().settings.language).toBe('ru');
@@ -69,6 +76,56 @@ describe('localization and save migration', () => {
     expect(save.currentDifficulty).toBe('gentle');
     expect(save.solvedCount).toBe(4);
     expect(save.tutorialCompleted).toBe(false);
+  });
+
+  it('parses atmosphere settings safely without changing save version', () => {
+    storage.setItem(
+      'bentoku.save.v4',
+      JSON.stringify({
+        version: 4,
+        settings: {
+          difficulty: 'gentle',
+          audioDefaultsVersion: 1,
+          musicTrackKey: 'music_pearl_arcade',
+          nightDim: 2,
+        },
+      }),
+    );
+
+    const save = new SaveService();
+    expect(save.settings).toMatchObject({ musicTrackKey: 'music_pearl_arcade', nightDim: 1 });
+    save.updateSettings({ musicTrackKey: 'not-a-track', nightDim: -0.25 });
+    expect(save.settings).toMatchObject({ musicTrackKey: 'music_pearl_arcade', nightDim: 0 });
+
+    const stored = JSON.parse(storage.getItem('bentoku.save.v4') ?? '{}');
+    stored.settings.musicTrackKey = 'missing-track';
+    stored.settings.nightDim = Number.NaN;
+    storage.setItem('bentoku.save.v4', JSON.stringify(stored));
+    expect(new SaveService().settings).toMatchObject({
+      musicTrackKey: DEFAULT_MUSIC_TRACK_KEY,
+      nightDim: 0,
+    });
+  });
+
+  it('does not overwrite newer settings from another active save service', () => {
+    const puzzleSceneSave = new SaveService();
+    const atmosphereSave = new SaveService();
+    atmosphereSave.updateSettings({ musicTrackKey: 'music_paper_lantern_logic', nightDim: 0.6 });
+    puzzleSceneSave.updateSettings({ soundVolume: 0.75 });
+    puzzleSceneSave.completeTutorial();
+
+    expect(new SaveService().settings).toMatchObject({
+      musicTrackKey: 'music_paper_lantern_logic',
+      nightDim: 0.6,
+      soundVolume: 0.75,
+    });
+  });
+
+  it('keeps difficulty names English independently of interface language', () => {
+    const i18n = new I18nService('ru');
+    expect(i18n.t('difficulty.master')).toBe('Мастер');
+    expect(englishDifficultyLabel('master')).toBe('Master');
+    expect(englishDifficultyLabel('cozy')).toBe('Cozy');
   });
 
   it('formats English and Russian counters from the same internal data', () => {

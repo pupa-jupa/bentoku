@@ -114,6 +114,8 @@ export interface PlayerSettings {
   sound: boolean;
   soundVolume: number;
   musicVolume: number;
+  musicTrackKey: string;
+  nightDim: number;
   reducedMotion: boolean;
   hintMode: boolean;
   difficulty: Difficulty;

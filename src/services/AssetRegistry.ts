@@ -5,6 +5,10 @@ export interface AssetEntry {
   path: string;
 }
 
+export interface MusicAssetEntry extends AssetEntry {
+  title: string;
+}
+
 export const pieceAssets: AssetEntry[] = ANIMALS.flatMap((animal) =>
   FOODS.map((food) => ({
     key: `piece_${animal}_${food}`,
@@ -62,14 +66,24 @@ export const soundAssets = {
 
 export type SoundName = keyof typeof soundAssets;
 
-export const musicAssets: AssetEntry[] = [
-  { key: 'music_sunlit_puzzle', path: 'assets/music/sunlit_puzzle.mp3' },
-  { key: 'music_paper_lantern_logic', path: 'assets/music/paper_lantern_logic.mp3' },
-  { key: 'music_bossa_nova', path: 'assets/music/bossa_nova.mp3' },
+export const musicAssets: MusicAssetEntry[] = [
+  { key: 'music_sunlit_puzzle', path: 'assets/music/sunlit_puzzle.mp3', title: 'Sunlit Puzzle' },
+  {
+    key: 'music_paper_lantern_logic',
+    path: 'assets/music/paper_lantern_logic.mp3',
+    title: 'Paper Lantern Logic',
+  },
+  { key: 'music_bossa_nova', path: 'assets/music/bossa_nova.mp3', title: 'Bossa Nova' },
   {
     key: 'music_paper_lantern_logic_short',
     path: 'assets/music/paper_lantern_logic_short.mp3',
+    title: 'Paper Lantern Logic · Short',
   },
-  { key: 'music_light_of_tea', path: 'assets/music/light_of_tea.mp3' },
-  { key: 'music_pearl_arcade', path: 'assets/music/pearl_arcade.mp3' },
+  { key: 'music_light_of_tea', path: 'assets/music/light_of_tea.mp3', title: 'Light of Tea' },
+  { key: 'music_pearl_arcade', path: 'assets/music/pearl_arcade.mp3', title: 'Pearl Arcade' },
 ];
+
+export const DEFAULT_MUSIC_TRACK_KEY = musicAssets[0]!.key;
+
+export const isMusicTrackKey = (value: unknown): value is string =>
+  typeof value === 'string' && musicAssets.some((asset) => asset.key === value);

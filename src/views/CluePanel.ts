@@ -1,11 +1,16 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_DISPLAY } from '../game/constants';
-import { CLUE_CONTENT_OFFSET_X, CLUE_DIVIDER_Y } from '../game/gameplayLayout';
+import {
+  calculatePartialClueLayout,
+  CLUE_ANCHOR_CELL_SIZE,
+  CLUE_ANCHOR_CENTER_Y,
+  CLUE_CONTENT_OFFSET_X,
+  CLUE_DIVIDER_Y,
+  CLUE_PARTIAL_CELL_SIZE,
+} from '../game/gameplayLayout';
 import type { CluePattern } from '../puzzle/types';
 import type { I18nService } from '../i18n/I18nService';
 import { ClueView } from './ClueView';
-
-const PARTIAL_CLUE_OFFSET_Y = -24;
 
 export class CluePanel extends Phaser.GameObjects.Container {
   readonly width = 390;
@@ -42,13 +47,18 @@ export class CluePanel extends Phaser.GameObjects.Container {
 
     const anchor = clues.find((clue) => clue.id === 'anchor-map');
     const spatial = clues.filter((clue) => clue.id !== 'anchor-map').slice(0, 6);
-    const compact = spatial.length > 4;
     if (anchor) {
-      const view = new ClueView(scene, anchor, CLUE_CONTENT_OFFSET_X, -178, 282);
+      const view = new ClueView(
+        scene,
+        anchor,
+        CLUE_CONTENT_OFFSET_X,
+        CLUE_ANCHOR_CENTER_Y,
+        CLUE_ANCHOR_CELL_SIZE,
+      );
       this.add(view);
     }
 
-    const divider = scene.add.graphics();
+    const divider = scene.add.graphics().setName('clue-divider');
     divider.lineStyle(2, COLORS.ink, 0.16);
     divider.lineBetween(
       -156 + CLUE_CONTENT_OFFSET_X,
@@ -57,25 +67,22 @@ export class CluePanel extends Phaser.GameObjects.Container {
       CLUE_DIVIDER_Y,
     );
     this.add(divider);
-    spatial.forEach((clue, index) => {
-      const row = Math.floor(index / 2);
-      const itemsInRow = Math.min(2, spatial.length - row * 2);
-      const column = index % 2;
-      const xPosition = (itemsInRow === 1 ? 0 : -82 + column * 164) + CLUE_CONTENT_OFFSET_X;
+    const placements = calculatePartialClueLayout(spatial);
+    placements.forEach((placement) => {
+      const clue = spatial[placement.index]!;
       const view = new ClueView(
         scene,
         clue,
-        xPosition,
-        (compact ? 6 + row * 116 : 20 + row * 138) + PARTIAL_CLUE_OFFSET_Y,
-        158,
-        compact,
+        placement.x + CLUE_CONTENT_OFFSET_X,
+        placement.y,
+        CLUE_PARTIAL_CELL_SIZE,
       );
       this.add(view);
     });
 
     if (spatial.length === 0) {
       const complete = scene.add
-        .text(CLUE_CONTENT_OFFSET_X, 92, i18n.t('clues.anchorOnly'), {
+        .text(CLUE_CONTENT_OFFSET_X, -42, i18n.t('clues.anchorOnly'), {
           fontFamily: 'Trebuchet MS, sans-serif',
           fontSize: '16px',
           color: '#7b6963',

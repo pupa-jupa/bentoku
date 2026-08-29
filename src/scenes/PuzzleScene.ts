@@ -35,16 +35,17 @@ import {
   type PuzzleDefinition,
 } from '../puzzle/types';
 import { AudioService } from '../services/AudioService';
-import { musicAssets, type SoundName } from '../services/AssetRegistry';
-import { MusicService } from '../services/MusicService';
+import { type SoundName } from '../services/AssetRegistry';
 import { SaveService } from '../services/SaveService';
 import { BentoBoard } from '../views/BentoBoard';
 import { CelebrationView } from '../views/CelebrationView';
 import { CluePanel } from '../views/CluePanel';
 import { GameHistoryModal, type HistoryGameRow } from '../views/GameHistoryModal';
 import { InventoryPanel } from '../views/InventoryPanel';
+import { bindModalDismissal } from '../views/ModalDismissController';
 import { getPieceVisualLayout, PieceView } from '../views/PieceView';
 import { TutorialView, type TutorialHighlight } from '../views/TutorialView';
+import { getAtmosphereScene } from './AtmosphereScene';
 
 interface ButtonSpec {
   x: number;
@@ -56,6 +57,7 @@ interface ButtonSpec {
   icon?: boolean;
   sound?: SoundName | false;
   allowDuringTutorial?: boolean;
+  disabled?: boolean;
 }
 
 const CELEBRATION_PIECE_STAGGER_MS = 55;
@@ -83,13 +85,14 @@ interface SliderSpec {
 
 interface ModalLayoutSpec {
   actionWidth?: number;
+  trackSelector?: boolean;
+  onDismiss?: () => void;
 }
 
 export class PuzzleScene extends Phaser.Scene {
   private generator = new PuzzleGenerator();
   private save!: SaveService;
   private audio!: AudioService;
-  private music!: MusicService;
   private i18n!: I18nService;
   private localizedI18n!: I18nService;
   private settings!: PlayerSettings;
@@ -125,6 +128,7 @@ export class PuzzleScene extends Phaser.Scene {
   private playContext: PlayContext = INFINITE_PLAY_CONTEXT;
   private launchContext?: PlayContext;
   private pendingCampaignContext?: PlayContext;
+  private trackListenerCleanup?: () => void;
 
   constructor() {
     super('PuzzleScene');
@@ -142,7 +146,6 @@ export class PuzzleScene extends Phaser.Scene {
     document.documentElement.lang = 'en';
     this.game.canvas.setAttribute('aria-label', this.i18n.t('app.ariaLabel'));
     this.audio = new AudioService(this, this.settings);
-    this.music = new MusicService(this, musicAssets, this.settings.musicVolume);
     const params = new URLSearchParams(window.location.search);
     const firstVisit = !this.save.tutorialCompleted;
     const requestedMode: GameMode = params.get('mode') === 'timed' ? 'timed' : 'standard';
@@ -330,23 +333,24 @@ export class PuzzleScene extends Phaser.Scene {
       sound: false,
     });
 
-    if (this.playContext.source !== 'campaign') {
-      this.makeButton({
-        x: 1166,
-        y: 54,
-        width: 92,
-        label: this.i18n.t('button.daily'),
-        callback: () => this.startDaily(),
-      });
-      this.makeButton({
-        x: 1270,
-        y: 54,
-        width: 92,
-        label: this.i18n.t('button.timed'),
-        callback: () => this.openTimedChallengeRules(),
-        primary: this.mode === 'timed',
-      });
-    }
+    const campaignToolbarLocked = this.playContext.source === 'campaign';
+    this.makeButton({
+      x: 1166,
+      y: 54,
+      width: 92,
+      label: this.i18n.t('button.daily'),
+      callback: () => this.startDaily(),
+      disabled: campaignToolbarLocked,
+    });
+    this.makeButton({
+      x: 1270,
+      y: 54,
+      width: 92,
+      label: this.i18n.t('button.timed'),
+      callback: () => this.openTimedChallengeRules(),
+      primary: this.mode === 'timed',
+      disabled: campaignToolbarLocked,
+    });
     this.undoButton = this.makeButton({
       x: 1362,
       y: 54,
@@ -452,7 +456,9 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private bindInput(): void {
-    this.input.once('pointerdown', () => this.music.start());
+    this.input.once('pointerdown', () =>
+      getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume),
+    );
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (!this.selectedPiece || this.dragging || this.modal || this.solved || !this.canPlay())
         return;
@@ -818,8 +824,16 @@ export class PuzzleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     container.add([background, text]);
-    container.setSize(spec.width, height).setInteractive({ useHandCursor: true });
+    container.setSize(spec.width, height);
+    if (spec.disabled) {
+      container.setAlpha(0.43);
+      if (background instanceof Phaser.GameObjects.Image) background.setTint(0xb8aaa4);
+      text.setColor('#8f7c75');
+    } else {
+      container.setInteractive({ useHandCursor: true });
+    }
     container.on('pointerdown', () => {
+      if (spec.disabled) return;
       if (this.tutorial?.active && !spec.allowDuringTutorial) return;
       if (spec.sound !== false) this.audio.play(spec.sound ?? 'ui_tap');
       this.tweens.add({
@@ -831,8 +845,12 @@ export class PuzzleScene extends Phaser.Scene {
       });
       spec.callback();
     });
-    container.on('pointerover', () => container.setScale(1.04));
-    container.on('pointerout', () => container.setScale(1));
+    container.on('pointerover', () => {
+      if (!spec.disabled) container.setScale(1.04);
+    });
+    container.on('pointerout', () => {
+      if (!spec.disabled) container.setScale(1);
+    });
     parent?.add(container);
     return container;
   }
@@ -988,12 +1006,20 @@ export class PuzzleScene extends Phaser.Scene {
           value: this.settings.musicVolume,
           onChange: (musicVolume) => {
             this.settings = this.save.updateSettings({ musicVolume });
-            this.music.setVolume(this.settings.musicVolume);
+            getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume);
+          },
+        },
+        {
+          label: this.localizedI18n.t('settings.nightDimming'),
+          value: this.settings.nightDim,
+          onChange: (nightDim) => {
+            this.settings = this.save.updateSettings({ nightDim });
+            getAtmosphereScene(this)?.setNightDim(this.settings.nightDim);
           },
         },
       ],
       true,
-      { actionWidth: 210 },
+      { actionWidth: 210, trackSelector: true },
     );
     if (withSound) this.audio.play('note_open');
   }
@@ -1048,8 +1074,11 @@ export class PuzzleScene extends Phaser.Scene {
     const modal = this.add.container(800, 450).setDepth(this.tutorial?.active ? 5000 : 2600);
     const shade = this.add.rectangle(0, 0, 1600, 900, COLORS.walnut, 0.26).setInteractive();
     const card = this.add.graphics();
+    const trackSelectorHeight = layout.trackSelector ? 72 : 0;
     const height =
-      Math.max(330, 240 + Math.ceil(actions.length / 2) * 62) + (sliders?.length ?? 0) * 88;
+      Math.max(330, 240 + Math.ceil(actions.length / 2) * 62) +
+      (sliders?.length ?? 0) * 88 +
+      trackSelectorHeight;
     const hasTitle = titleText.trim().length > 0;
     card.fillStyle(COLORS.shadow, 0.17);
     card.fillRoundedRect(-312, -height / 2 + 12, 640, height, 38);
@@ -1078,8 +1107,11 @@ export class PuzzleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     modal.add([shade, card, ...(title ? [title] : []), body]);
+    if (layout.trackSelector) {
+      this.makeTrackSelector(modal, -height / 2 + 224);
+    }
     sliders?.forEach((slider, index) => {
-      this.makeSlider(modal, -height / 2 + 218 + index * 88, slider);
+      this.makeSlider(modal, -height / 2 + 218 + trackSelectorHeight + index * 88, slider);
     });
     const columns = actions.length === 1 ? 1 : 2;
     const rowCount = Math.ceil(actions.length / columns);
@@ -1115,6 +1147,14 @@ export class PuzzleScene extends Phaser.Scene {
         this.closeModal();
       });
       modal.add(close);
+      bindModalDismissal({
+        scene: this,
+        host: modal,
+        backdrop: shade,
+        card,
+        cardBounds: { x: -320, y: -height / 2, width: 640, height },
+        dismiss: layout.onDismiss ?? (() => this.closeModal()),
+      });
     }
     modal.setAlpha(0).setScale(0.96);
     this.tweens.add({ targets: modal, alpha: 1, scale: 1, duration: 180, ease: 'Sine.easeOut' });
@@ -1236,10 +1276,58 @@ export class PuzzleScene extends Phaser.Scene {
     parent.add([label, visual, zone]);
   }
 
+  private makeTrackSelector(parent: Phaser.GameObjects.Container, y: number): void {
+    const atmosphere = getAtmosphereScene(this);
+    const label = this.add
+      .text(0, y - 18, this.localizedI18n.t('settings.currentTrack'), {
+        fontFamily: FONT_BODY,
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: '#6f554d',
+      })
+      .setOrigin(0.5);
+    const title = this.add
+      .text(0, y + 17, atmosphere?.currentTrackTitle ?? '', {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#765149',
+      })
+      .setOrigin(0.5)
+      .setName('current-bgm-title');
+    const makeArrow = (x: number, glyph: string, callback: () => void): Phaser.GameObjects.Text => {
+      const arrow = this.add
+        .text(x, y + 16, glyph, {
+          fontFamily: FONT_DISPLAY,
+          fontSize: '29px',
+          fontStyle: 'bold',
+          color: '#a86468',
+          backgroundColor: '#f4d7cfcc',
+          padding: { x: 12, y: 1 },
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+      arrow.on('pointerdown', () => {
+        this.audio.play('ui_tap');
+        callback();
+      });
+      return arrow;
+    };
+    const previous = makeArrow(-205, '‹', () => atmosphere?.previousTrack());
+    const next = makeArrow(205, '›', () => atmosphere?.nextTrack());
+    this.trackListenerCleanup?.();
+    this.trackListenerCleanup = atmosphere?.onTrackChange((trackTitle) =>
+      title.setText(trackTitle),
+    );
+    parent.add([label, title, previous, next]);
+  }
+
   private closeModal(resumeElapsed = true): void {
     if (!this.modal) return;
     this.modal.destroy(true);
     this.modal = undefined;
+    this.trackListenerCleanup?.();
+    this.trackListenerCleanup = undefined;
     if (resumeElapsed) this.resumeElapsedTracking();
   }
 
@@ -1560,16 +1648,28 @@ export class PuzzleScene extends Phaser.Scene {
 
   private openCampaignTimedRules(): void {
     if (this.solved || this.tutorial?.active) return;
-    this.openModal(this.i18n.t('timed.title'), this.localizedI18n.t('campaign.timedRules'), [
-      {
-        label: this.localizedI18n.t('button.startChallenge'),
-        callback: () => {
-          this.closeModal();
-          this.startCountdown(() => this.timer?.start());
+    this.openModal(
+      this.i18n.t('timed.title'),
+      this.localizedI18n.t('campaign.timedRules'),
+      [
+        {
+          label: this.localizedI18n.t('button.startChallenge'),
+          callback: () => {
+            this.closeModal();
+            this.startCountdown(() => this.timer?.start());
+          },
+          primary: true,
         },
-        primary: true,
+      ],
+      undefined,
+      true,
+      {
+        onDismiss: () => {
+          this.closeModal(false);
+          this.scene.start('CampaignScene');
+        },
       },
-    ]);
+    );
   }
 
   private startTimedChallenge(seed: string): void {

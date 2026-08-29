@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_BODY, FONT_DISPLAY } from '../game/constants';
 import { formatElapsedTime } from '../gameplay/ElapsedTimer';
+import { englishDifficultyLabel } from '../i18n/difficultyLabels';
 import type { I18nService } from '../i18n/I18nService';
-import type { TranslationKey } from '../i18n/translations';
 import type { GameHistoryEntry } from '../puzzle/types';
+import { bindModalDismissal } from './ModalDismissController';
 
 export const HISTORY_PAGE_SIZE = 7;
 
@@ -75,6 +76,14 @@ export class GameHistoryModal extends Phaser.GameObjects.Container {
 
     const close = this.makeSymbolButton(534, -298, '×', callbacks.close, 42, 1, false);
     this.add([shade, card, title, subtitle, copyHint, close]);
+    bindModalDismissal({
+      scene,
+      host: this,
+      backdrop: shade,
+      card,
+      cardBounds: { x: -582, y: -340, width: 1164, height: 682 },
+      dismiss: callbacks.close,
+    });
 
     this.addHeader(i18n.t('history.date'), COLUMN_X.date, 178, 'left');
     this.addHeader(i18n.t('history.seed'), COLUMN_X.seed, 176, 'left');
@@ -188,13 +197,7 @@ export class GameHistoryModal extends Phaser.GameObjects.Container {
     });
     this.rowsLayer.add(seed);
 
-    this.addRowText(
-      this.i18n.t(`difficulty.${row.difficulty}` as TranslationKey),
-      COLUMN_X.difficulty,
-      y,
-      150,
-      'left',
-    );
+    this.addRowText(englishDifficultyLabel(row.difficulty), COLUMN_X.difficulty, y, 150, 'left');
     this.addRowText(formatElapsedTime(row.durationMs), COLUMN_X.duration, y, 106, 'center');
     this.addRowText(String(row.moves), COLUMN_X.moves, y, 82, 'center');
     this.rowsLayer.add(

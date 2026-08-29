@@ -20,8 +20,6 @@ import { FONT_BODY } from '../game/constants';
 import { campaignPlayContext } from '../game/playContext';
 import { I18nService } from '../i18n/I18nService';
 import { AudioService } from '../services/AudioService';
-import { musicAssets } from '../services/AssetRegistry';
-import { MusicService } from '../services/MusicService';
 import { SaveService } from '../services/SaveService';
 
 interface StorySceneData {
@@ -33,7 +31,6 @@ export class StoryScene extends Phaser.Scene {
   private save!: SaveService;
   private i18n!: I18nService;
   private audio!: AudioService;
-  private music!: MusicService;
   private story!: CampaignStory;
   private orderId!: CampaignOrderId;
   private phase: StoryPhase = 'intro';
@@ -54,8 +51,6 @@ export class StoryScene extends Phaser.Scene {
     const settings = this.save.settings;
     this.i18n = new I18nService(settings.language);
     this.audio = new AudioService(this, settings);
-    this.music = new MusicService(this, musicAssets, settings.musicVolume);
-    this.music.start();
     const order = getCampaignOrder(this.orderId);
     this.story = getCampaignStory(order.chapter);
     document.documentElement.lang = settings.language;

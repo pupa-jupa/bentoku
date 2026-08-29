@@ -8,6 +8,7 @@ import {
 import type { PlayContext } from '../game/playContext';
 import type { CampaignStoryEventId } from '../campaign/storyData';
 import { parseDifficulty } from '../puzzle/DifficultyEvaluator';
+import { DEFAULT_MUSIC_TRACK_KEY, isMusicTrackKey } from './AssetRegistry';
 import {
   emptyBoard,
   toBoard,
@@ -62,6 +63,8 @@ const defaults = (): SaveData => ({
     sound: true,
     soundVolume: DEFAULT_SOUND_VOLUME,
     musicVolume: DEFAULT_MUSIC_VOLUME,
+    musicTrackKey: DEFAULT_MUSIC_TRACK_KEY,
+    nightDim: 0,
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     hintMode: true,
     difficulty: 'gentle',
@@ -79,6 +82,30 @@ const defaults = (): SaveData => ({
     timed: { attempts: 0, wins: 0, bestRemainingMs: 0 },
   },
 });
+
+const parsePlayerSettings = (value: unknown, fallback: PlayerSettings): PlayerSettings => {
+  const settings = asRecord(value);
+  const difficulty = parseDifficulty(String(settings.difficulty ?? '')) ?? fallback.difficulty;
+  return {
+    language: parseLanguage(settings.language),
+    audioDefaultsVersion: AUDIO_DEFAULTS_VERSION,
+    sound: typeof settings.sound === 'boolean' ? settings.sound : fallback.sound,
+    soundVolume: clampVolume(settings.soundVolume, fallback.soundVolume),
+    musicVolume:
+      finiteNonNegative(settings.audioDefaultsVersion) >= AUDIO_DEFAULTS_VERSION
+        ? clampVolume(settings.musicVolume, settings.sound === false ? 0 : fallback.musicVolume)
+        : DEFAULT_MUSIC_VOLUME,
+    musicTrackKey: isMusicTrackKey(settings.musicTrackKey)
+      ? settings.musicTrackKey
+      : DEFAULT_MUSIC_TRACK_KEY,
+    nightDim: clampVolume(settings.nightDim, fallback.nightDim),
+    reducedMotion:
+      typeof settings.reducedMotion === 'boolean' ? settings.reducedMotion : fallback.reducedMotion,
+    hintMode: typeof settings.hintMode === 'boolean' ? settings.hintMode : fallback.hintMode,
+    difficulty,
+    mode: parseMode(settings.mode),
+  };
+};
 
 type StoredRecord = Record<string, unknown>;
 
@@ -121,7 +148,7 @@ export class SaveService {
 
   constructor() {
     this.data = this.load();
-    this.persist();
+    this.persist(false);
   }
 
   private load(): SaveData {
@@ -199,27 +226,7 @@ export class SaveService {
       return {
         version: 4,
         history,
-        settings: {
-          language: parseLanguage(settings.language),
-          audioDefaultsVersion: AUDIO_DEFAULTS_VERSION,
-          sound: typeof settings.sound === 'boolean' ? settings.sound : fallback.settings.sound,
-          soundVolume: clampVolume(settings.soundVolume, DEFAULT_SOUND_VOLUME),
-          musicVolume:
-            finiteNonNegative(settings.audioDefaultsVersion) >= AUDIO_DEFAULTS_VERSION
-              ? clampVolume(
-                  settings.musicVolume,
-                  settings.sound === false ? 0 : DEFAULT_MUSIC_VOLUME,
-                )
-              : DEFAULT_MUSIC_VOLUME,
-          reducedMotion:
-            typeof settings.reducedMotion === 'boolean'
-              ? settings.reducedMotion
-              : fallback.settings.reducedMotion,
-          hintMode:
-            typeof settings.hintMode === 'boolean' ? settings.hintMode : fallback.settings.hintMode,
-          difficulty,
-          mode: parseMode(settings.mode),
-        },
+        settings: parsePlayerSettings(settings, { ...fallback.settings, difficulty }),
         currentPuzzle,
         tutorial: {
           completedVersion: finiteNonNegative(tutorial.completedVersion),
@@ -244,12 +251,20 @@ export class SaveService {
     }
   }
 
-  private persist(): void {
+  private persist(preserveStoredSettings = true): void {
     try {
+      if (preserveStoredSettings) this.syncStoredSettings();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
     } catch {
       // The game remains playable when storage is unavailable or full.
     }
+  }
+
+  private syncStoredSettings(): void {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    const parsed = asRecord(JSON.parse(stored));
+    this.data.settings = parsePlayerSettings(parsed.settings, this.data.settings);
   }
 
   get settings(): PlayerSettings {
@@ -400,6 +415,11 @@ export class SaveService {
   }
 
   updateSettings(settings: Partial<PlayerSettings>): PlayerSettings {
+    try {
+      this.syncStoredSettings();
+    } catch {
+      // Keep the current in-memory settings when persisted data is unavailable or malformed.
+    }
     this.data.settings = {
       ...this.data.settings,
       ...settings,
@@ -411,8 +431,12 @@ export class SaveService {
       mode: settings.mode ? parseMode(settings.mode) : this.data.settings.mode,
       soundVolume: clampVolume(settings.soundVolume, this.data.settings.soundVolume),
       musicVolume: clampVolume(settings.musicVolume, this.data.settings.musicVolume),
+      musicTrackKey: isMusicTrackKey(settings.musicTrackKey)
+        ? settings.musicTrackKey
+        : this.data.settings.musicTrackKey,
+      nightDim: clampVolume(settings.nightDim, this.data.settings.nightDim),
     };
-    this.persist();
+    this.persist(false);
     return this.settings;
   }
 

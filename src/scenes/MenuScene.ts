@@ -5,9 +5,10 @@ import { I18nService } from '../i18n/I18nService';
 import type { TranslationKey } from '../i18n/translations';
 import type { PlayerSettings } from '../puzzle/types';
 import { AudioService } from '../services/AudioService';
-import { musicAssets } from '../services/AssetRegistry';
-import { MusicService } from '../services/MusicService';
+import { DevModeService } from '../services/DevModeService';
 import { SaveService } from '../services/SaveService';
+import { bindModalDismissal } from '../views/ModalDismissController';
+import { getAtmosphereScene } from './AtmosphereScene';
 
 type DunyaExpression = 'neutral' | 'blink' | 'speaking' | 'delighted' | 'focused';
 
@@ -23,12 +24,20 @@ export class MenuScene extends Phaser.Scene {
   private settings!: PlayerSettings;
   private i18n!: I18nService;
   private audio!: AudioService;
-  private music!: MusicService;
+  private devMode!: DevModeService;
   private menuLayer?: Phaser.GameObjects.Container;
   private panel?: Phaser.GameObjects.Container;
   private dunya?: Phaser.GameObjects.Image;
   private dunyaExpression: DunyaExpression = 'neutral';
   private blinkTimer?: Phaser.Time.TimerEvent;
+  private trackListenerCleanup?: () => void;
+  private readonly devModeKeyHandler = (event: KeyboardEvent): void => {
+    if (event.code !== 'KeyD' || !event.ctrlKey || !event.shiftKey || event.repeat) return;
+    event.preventDefault();
+    this.devMode.toggle();
+    this.closePanel(false);
+    this.renderMenu();
+  };
 
   constructor() {
     super('MenuScene');
@@ -39,8 +48,12 @@ export class MenuScene extends Phaser.Scene {
     this.settings = this.save.settings;
     this.i18n = new I18nService(this.settings.language);
     this.audio = new AudioService(this, this.settings);
-    this.music = new MusicService(this, musicAssets, this.settings.musicVolume);
-    this.music.start();
+    this.devMode = new DevModeService();
+    this.input.keyboard?.on('keydown', this.devModeKeyHandler);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown', this.devModeKeyHandler);
+      this.trackListenerCleanup?.();
+    });
     this.renderMenu();
   }
 
@@ -90,6 +103,22 @@ export class MenuScene extends Phaser.Scene {
 
     this.menuLayer.add([background, this.dunya, foreground, title, tagline]);
 
+    if (this.devMode.enabled) {
+      const badge = this.add
+        .text(545, 116, 'DEV MODE', {
+          fontFamily: FONT_BODY,
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: '#fffaf1',
+          backgroundColor: '#8e5f58dd',
+          padding: { x: 12, y: 7 },
+          letterSpacing: 1,
+        })
+        .setOrigin(0.5)
+        .setName('dev-mode-badge');
+      this.menuLayer.add(badge);
+    }
+
     const actions: MenuAction[] = [
       {
         id: 'campaign',
@@ -117,16 +146,20 @@ export class MenuScene extends Phaser.Scene {
       },
     ];
 
-    actions.forEach((action, index) => this.createMenuButton(action, 268 + index * 166, index));
+    actions.forEach((action, index) => {
+      const enabled =
+        this.devMode.enabled || (action.id !== 'campaign' && action.id !== 'achievements');
+      this.createMenuButton(action, 268 + index * 166, index, enabled);
+    });
     this.setDunyaExpression('neutral');
     this.scheduleBlink();
   }
 
-  private createMenuButton(action: MenuAction, y: number, index: number): void {
+  private createMenuButton(action: MenuAction, y: number, index: number, enabled: boolean): void {
     const container = this.add
       .container(312, y)
       .setName(`menu-action-${action.id}`)
-      .setAlpha(this.settings.reducedMotion ? 1 : 0);
+      .setAlpha(this.settings.reducedMotion ? (enabled ? 1 : 0.46) : 0);
     const art = this.add.image(0, 0, 'menu_button_normal').setDisplaySize(670, 223);
     const label = this.i18n.t(action.label);
     const text = this.add
@@ -142,20 +175,27 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     container.add([art, text]);
-    container.setSize(520, 148).setInteractive({ useHandCursor: true });
+    container.setSize(520, 148);
+    if (!enabled) {
+      art.setTint(0xb9aaa4);
+      text.setColor('#8f7b75');
+    } else {
+      container.setInteractive({ useHandCursor: true });
+    }
     container.on('pointerover', () => {
-      if (this.panel) return;
+      if (!enabled || this.panel) return;
       art.setTexture('menu_button_hover');
       container.setScale(1.025);
       this.setDunyaExpression(action.expression);
     });
     container.on('pointerout', () => {
+      if (!enabled) return;
       art.setTexture('menu_button_normal');
       container.setScale(1);
       if (!this.panel) this.setDunyaExpression('neutral');
     });
     container.on('pointerdown', () => {
-      if (this.panel) return;
+      if (!enabled || this.panel) return;
       this.audio.play('ui_tap');
       art.setTexture('menu_button_pressed');
       container.setScale(0.985);
@@ -171,7 +211,7 @@ export class MenuScene extends Phaser.Scene {
       this.tweens.add({
         targets: container,
         y,
-        alpha: 1,
+        alpha: enabled ? 1 : 0.46,
         duration: 310,
         delay: 90 + index * 65,
         ease: 'Sine.easeOut',
@@ -258,11 +298,11 @@ export class MenuScene extends Phaser.Scene {
   private openSettings(withSound = true): void {
     this.closePanel(false);
     this.setDunyaExpression('speaking');
-    const panel = this.createPanelFrame(this.i18n.t('settings.title'), 720);
+    const panel = this.createPanelFrame(this.i18n.t('settings.title'), 800);
 
     this.createPanelButton(
       panel,
-      -158,
+      -225,
       this.i18n.t('settings.effects', {
         state: this.i18n.t(this.settings.sound ? 'settings.on' : 'settings.off'),
       }),
@@ -274,7 +314,7 @@ export class MenuScene extends Phaser.Scene {
     );
     this.createPanelButton(
       panel,
-      -54,
+      -143,
       this.i18n.t('settings.motion', {
         state: this.i18n.t(
           this.settings.reducedMotion ? 'settings.motionReduced' : 'settings.motionGentle',
@@ -290,7 +330,7 @@ export class MenuScene extends Phaser.Scene {
     );
     this.createPanelButton(
       panel,
-      50,
+      -61,
       this.i18n.t('settings.language', {
         language: this.i18n.t(this.settings.language === 'en' ? 'language.en' : 'language.ru'),
       }),
@@ -299,7 +339,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.createSlider(
       panel,
-      192,
+      146,
       this.i18n.t('settings.effectsVolume'),
       this.settings.soundVolume,
       (soundVolume) => {
@@ -309,12 +349,24 @@ export class MenuScene extends Phaser.Scene {
     );
     this.createSlider(
       panel,
-      286,
+      228,
       this.i18n.t('settings.music'),
       this.settings.musicVolume,
       (musicVolume) => {
         this.settings = this.save.updateSettings({ musicVolume });
-        this.music.setVolume(this.settings.musicVolume);
+        getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume);
+      },
+    );
+
+    this.createTrackSelector(panel, 40);
+    this.createSlider(
+      panel,
+      310,
+      this.i18n.t('settings.nightDimming'),
+      this.settings.nightDim,
+      (nightDim) => {
+        this.settings = this.save.updateSettings({ nightDim });
+        getAtmosphereScene(this)?.setNightDim(this.settings.nightDim);
       },
     );
 
@@ -365,6 +417,14 @@ export class MenuScene extends Phaser.Scene {
     close.on('pointerdown', () => this.closePanel());
     panel.add([shade, shadow, card, title, close]);
     this.panel = panel;
+    bindModalDismissal({
+      scene: this,
+      host: panel,
+      backdrop: shade,
+      card,
+      cardBounds: { x: -382, y: -height / 2, width: 764, height },
+      dismiss: () => this.closePanel(),
+    });
     return panel;
   }
 
@@ -456,6 +516,52 @@ export class MenuScene extends Phaser.Scene {
     panel.add([label, visual, zone]);
   }
 
+  private createTrackSelector(panel: Phaser.GameObjects.Container, y: number): void {
+    const atmosphere = getAtmosphereScene(this);
+    const caption = this.add
+      .text(0, y - 27, this.i18n.t('settings.currentTrack'), {
+        fontFamily: FONT_BODY,
+        fontSize: '17px',
+        fontStyle: 'bold',
+        color: '#6f514a',
+      })
+      .setOrigin(0.5);
+    const title = this.add
+      .text(0, y + 11, atmosphere?.currentTrackTitle ?? '', {
+        fontFamily: 'Georgia, Times New Roman, serif',
+        fontSize: '19px',
+        fontStyle: 'bold',
+        color: '#7a5650',
+      })
+      .setOrigin(0.5)
+      .setName('current-bgm-title');
+    const makeArrow = (x: number, glyph: string, callback: () => void): Phaser.GameObjects.Text => {
+      const arrow = this.add
+        .text(x, y + 10, glyph, {
+          fontFamily: FONT_DISPLAY,
+          fontSize: '34px',
+          fontStyle: 'bold',
+          color: '#a86468',
+          backgroundColor: '#f5d9d1cc',
+          padding: { x: 14, y: 2 },
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+      arrow.on('pointerdown', () => {
+        this.audio.play('ui_tap');
+        callback();
+      });
+      return arrow;
+    };
+    const previous = makeArrow(-220, '‹', () => atmosphere?.previousTrack());
+    const next = makeArrow(220, '›', () => atmosphere?.nextTrack());
+    this.trackListenerCleanup?.();
+    this.trackListenerCleanup = atmosphere?.onTrackChange((trackTitle) =>
+      title.setText(trackTitle),
+    );
+    panel.add([caption, title, previous, next]);
+  }
+
   private revealPanel(panel: Phaser.GameObjects.Container): void {
     if (this.settings.reducedMotion) return;
     panel.setAlpha(0).setScale(0.97);
@@ -473,6 +579,8 @@ export class MenuScene extends Phaser.Scene {
     if (withSound) this.audio.play('ui_tap');
     this.panel.destroy(true);
     this.panel = undefined;
+    this.trackListenerCleanup?.();
+    this.trackListenerCleanup = undefined;
     this.setDunyaExpression('neutral');
   }
 }

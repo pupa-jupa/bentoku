@@ -5,33 +5,16 @@ import type { CluePattern } from '../puzzle/types';
 export class ClueView extends Phaser.GameObjects.Container {
   readonly clue: CluePattern;
 
-  constructor(
-    scene: Phaser.Scene,
-    clue: CluePattern,
-    x: number,
-    y: number,
-    maxWidth: number,
-    compact = false,
-  ) {
+  constructor(scene: Phaser.Scene, clue: CluePattern, x: number, y: number, cellSize: number) {
     super(scene, x, y);
     this.clue = clue;
+    this.setName(`clue-${clue.id}`);
     scene.add.existing(this);
-    const isAnchor = clue.width === 3 && clue.height === 3;
-    const cellSize = isAnchor ? 48 : Math.min(44, (maxWidth - 24) / clue.width);
     const gridWidth = cellSize * clue.width;
     const gridHeight = cellSize * clue.height;
-    const padTop = compact ? 12 : 16;
-    const cardWidth = maxWidth;
-    const cardHeight = gridHeight + padTop + (compact ? 10 : 14);
-
-    const card = scene.add.graphics();
-    card.fillStyle(isAnchor ? 0xf3f1d9 : COLORS.milk, isAnchor ? 0.72 : 0.67);
-    card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-    this.add(card);
-
     const originX = -gridWidth / 2;
-    const originY = -cardHeight / 2 + padTop;
-    const graphics = scene.add.graphics();
+    const originY = -gridHeight / 2;
+    const graphics = scene.add.graphics().setName('clue-grid');
     graphics.lineStyle(2, COLORS.ink, 0.68);
     for (let column = 0; column <= clue.width; column += 1) {
       const wobble = column % 2 === 0 ? 0 : 0.7;
@@ -97,7 +80,7 @@ export class ClueView extends Phaser.GameObjects.Container {
       }
     }
 
-    this.setSize(cardWidth, cardHeight);
+    this.setSize(gridWidth, gridHeight);
   }
 }
 

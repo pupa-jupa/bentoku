@@ -6,6 +6,7 @@ interface GameObjectState {
   text?: string;
   width?: number;
   height?: number;
+  alpha?: number;
   x?: number;
   y?: number;
   input?: { enabled: boolean };
@@ -16,7 +17,7 @@ interface GameObjectState {
 
 interface SceneState {
   selectedPiece: string | null;
-  settings: { language: string; musicVolume: number };
+  settings: { language: string; musicVolume: number; nightDim: number; musicTrackKey: string };
   placement: { board: Array<string | null>; moves: number };
   puzzle: { solution: string[]; difficulty: string; seed: string };
   playContext?: { source: string; allowReveal: boolean; campaignOrderId?: string };
@@ -48,6 +49,8 @@ interface SceneState {
   children: { list: GameObjectState[] };
 }
 
+const SCENE_READY_TIMEOUT = 30_000;
+
 const screenPoint = async (page: Page, x: number, y: number) =>
   page.evaluate(
     ({ x, y }) => {
@@ -73,43 +76,54 @@ const sceneTexts = async (page: Page, sceneKey = 'PuzzleScene'): Promise<string[
 
 const enterInfinite = async (page: Page): Promise<void> => {
   await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const game = (
-          window as unknown as {
-            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
-          }
-        ).__BENTOKU_GAME__;
-        const menu = game?.scene.getScene('MenuScene');
-        const hasAction = (objects: GameObjectState[]): boolean =>
-          objects.some(
-            (object) => object.name === 'menu-action-infinite' || hasAction(object.list ?? []),
-          );
-        return Boolean(menu && hasAction(menu.children.list));
-      }),
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const game = (
+            window as unknown as {
+              __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+            }
+          ).__BENTOKU_GAME__;
+          const menu = game?.scene.getScene('MenuScene');
+          const hasAction = (objects: GameObjectState[]): boolean =>
+            objects.some(
+              (object) => object.name === 'menu-action-infinite' || hasAction(object.list ?? []),
+            );
+          return Boolean(menu && hasAction(menu.children.list));
+        }),
+      { timeout: SCENE_READY_TIMEOUT },
     )
     .toBe(true);
   const infinite = await screenPoint(page, 312, 434);
   await page.mouse.click(infinite.x, infinite.y);
   await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const game = (
-          window as unknown as {
-            __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
-          }
-        ).__BENTOKU_GAME__;
-        return Boolean(game?.scene.getScene('PuzzleScene')?.puzzle);
-      }),
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const game = (
+            window as unknown as {
+              __BENTOKU_GAME__?: { scene: { getScene(key: string): SceneState | undefined } };
+            }
+          ).__BENTOKU_GAME__;
+          return Boolean(game?.scene.getScene('PuzzleScene')?.puzzle);
+        }),
+      { timeout: SCENE_READY_TIMEOUT },
     )
     .toBe(true);
+};
+
+const enableDevMode = async (page: Page): Promise<void> => {
+  if ((await sceneTexts(page, 'MenuScene')).includes('DEV MODE')) return;
+  await page.keyboard.press('Control+Shift+KeyD');
+  await expect
+    .poll(() => sceneTexts(page, 'MenuScene'), { timeout: SCENE_READY_TIMEOUT })
+    .toContain('DEV MODE');
 };
 
 const playStoryIntro = async (page: Page): Promise<void> => {
   await expect.poll(() => sceneTexts(page, 'StoryScene')).toContain('Continue');
   const dayContinue = await screenPoint(page, 785, 760);
   await page.mouse.click(dayContinue.x, dayContinue.y);
-  await page.waitForTimeout(350);
   await expect
     .poll(async () =>
       (await sceneTexts(page, 'StoryScene')).some((copy) => copy.includes('Visitor artwork slot')),
@@ -117,15 +131,22 @@ const playStoryIntro = async (page: Page): Promise<void> => {
     .toBe(true);
 
   for (let index = 0; index < 6; index += 1) {
+    const before = (await sceneTexts(page, 'StoryScene')).join('\n');
     const continueButton = await screenPoint(page, 1285, 746);
     await page.mouse.click(continueButton.x, continueButton.y);
-    await page.waitForTimeout(350);
+    await expect
+      .poll(async () => (await sceneTexts(page, 'StoryScene')).join('\n'), {
+        timeout: SCENE_READY_TIMEOUT,
+      })
+      .not.toBe(before);
   }
 };
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?seed=BENTO-E2E-0001&difficulty=gentle');
-  await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Infinite');
+  await expect
+    .poll(() => sceneTexts(page, 'MenuScene'), { timeout: SCENE_READY_TIMEOUT })
+    .toContain('Infinite');
   await page.evaluate(() => localStorage.clear());
   await page.evaluate(() =>
     localStorage.setItem(
@@ -182,6 +203,25 @@ test('opens on the four-action Dunya café menu before gameplay', async ({ page 
         return scene.dunya?.texture?.key;
       }),
     )
+    .toBe('dunya_neutral');
+  await page.mouse.click(campaign.x, campaign.y);
+  expect(await sceneTexts(page, 'CampaignScene')).not.toContain("Dunya's Order Book");
+
+  await enableDevMode(page);
+  await page.mouse.move(campaign.x, campaign.y);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (
+          window as unknown as {
+            __BENTOKU_GAME__: {
+              scene: { getScene(key: string): { dunya?: { texture?: { key: string } } } };
+            };
+          }
+        ).__BENTOKU_GAME__.scene.getScene('MenuScene');
+        return scene.dunya?.texture?.key;
+      }),
+    )
     .toBe('dunya_focused');
 
   await enterInfinite(page);
@@ -192,6 +232,7 @@ test('opens the real campaign book and unlocks the next fixed order after a win'
 }) => {
   await page.goto('/');
   await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Campaign');
+  await enableDevMode(page);
   const campaignButton = await screenPoint(page, 312, 268);
   await page.mouse.click(campaignButton.x, campaignButton.y);
   await expect.poll(() => sceneTexts(page, 'CampaignScene')).toContain("Dunya's Order Book");
@@ -245,8 +286,24 @@ test('opens the real campaign book and unlocks the next fixed order after a win'
     });
 
   const campaignCopy = await sceneTexts(page);
-  expect(campaignCopy).not.toContain('Daily');
-  expect(campaignCopy).not.toContain('Rush');
+  expect(campaignCopy).toContain('Daily');
+  expect(campaignCopy).toContain('Rush');
+  const campaignToolbar = await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+      }
+    ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+    return scene.children.list
+      .filter((object) =>
+        object.list?.some((child) => child.text === 'Daily' || child.text === 'Rush'),
+      )
+      .map((object) => ({ alpha: object.alpha, interactive: object.input?.enabled ?? false }));
+  });
+  expect(campaignToolbar).toEqual([
+    { alpha: 0.43, interactive: false },
+    { alpha: 0.43, interactive: false },
+  ]);
   const helpButton = await screenPoint(page, 1426, 54);
   await page.mouse.click(helpButton.x, helpButton.y);
   await expect.poll(() => sceneTexts(page)).not.toContain('Reveal one');
@@ -277,7 +334,18 @@ test('opens the real campaign book and unlocks the next fixed order after a win'
     const slotPoint = await screenPoint(page, puzzle.slots[index]!.x, puzzle.slots[index]!.y);
     await page.mouse.click(piecePoint.x, piecePoint.y);
     await page.mouse.click(slotPoint.x, slotPoint.y);
-    if (index < puzzle.solution.length - 1) await page.waitForTimeout(210);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (
+              window as unknown as {
+                __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+              }
+            ).__BENTOKU_GAME__.scene.getScene('PuzzleScene').placement.moves,
+        ),
+      )
+      .toBe(index + 1);
   }
 
   await expect.poll(() => sceneTexts(page)).toContain('Order stamped! The next page is ready.');
@@ -323,6 +391,7 @@ test('keeps the only campaign finale timed at 1:45 with Reveal locked', async ({
     };
     localStorage.setItem('bentoku.save.v4', JSON.stringify(stored));
   });
+  await enableDevMode(page);
   const campaignButton = await screenPoint(page, 312, 268);
   await page.mouse.click(campaignButton.x, campaignButton.y);
   await expect.poll(() => sceneTexts(page, 'CampaignScene')).toContain('Festival Window');
@@ -332,6 +401,18 @@ test('keeps the only campaign finale timed at 1:45 with Reveal locked', async ({
   await page.mouse.click(startOrder.x, startOrder.y);
   await expect
     .poll(() => sceneTexts(page))
+    .toContain(
+      "Complete Dunya's final Master order in 1 minute 45 seconds. Reveal is locked, and every retry keeps the timer.",
+    );
+
+  const outsideRules = await screenPoint(page, 120, 120);
+  await page.mouse.click(outsideRules.x, outsideRules.y);
+  await expect
+    .poll(() => sceneTexts(page, 'CampaignScene'), { timeout: SCENE_READY_TIMEOUT })
+    .toContain('Festival Window');
+  await page.mouse.click(startOrder.x, startOrder.y);
+  await expect
+    .poll(() => sceneTexts(page), { timeout: SCENE_READY_TIMEOUT })
     .toContain(
       "Complete Dunya's final Master order in 1 minute 45 seconds. Reveal is locked, and every retry keeps the timer.",
     );
@@ -357,7 +438,7 @@ test('keeps the only campaign finale timed at 1:45 with Reveal locked', async ({
             remainingMs: scene.timer?.remainingMs ?? 0,
           };
         }),
-      { timeout: 10_000 },
+      { timeout: SCENE_READY_TIMEOUT },
     )
     .toMatchObject({
       source: 'campaign',
@@ -481,7 +562,18 @@ test('supports drag, undo, tap placement, and a complete winning run', async ({ 
     const slotPoint = await screenPoint(page, puzzle.slots[index]!.x, puzzle.slots[index]!.y);
     await page.mouse.click(piecePoint.x, piecePoint.y);
     await page.mouse.click(slotPoint.x, slotPoint.y);
-    if (index < puzzle.solution.length - 1) await page.waitForTimeout(220);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (
+              window as unknown as {
+                __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+              }
+            ).__BENTOKU_GAME__.scene.getScene('PuzzleScene').placement.moves,
+        ),
+      )
+      .toBe(index + 1);
   }
 
   await expect
@@ -571,8 +663,9 @@ test('disables and dims the animal family omitted from the solution', async ({ p
 });
 
 test('shows the active elapsed timer and paginates game history with replay', async ({ page }) => {
-  await page.waitForTimeout(1_150);
-  expect((await sceneTexts(page)).some((text) => /TIME 00:0[1-9]/.test(text))).toBe(true);
+  await expect
+    .poll(async () => (await sceneTexts(page)).some((text) => /TIME 00:0[1-9]/.test(text)))
+    .toBe(true);
 
   await page.goto('/');
   await expect.poll(() => sceneTexts(page, 'MenuScene')).toContain('Infinite');
@@ -654,6 +747,124 @@ test('shows the active elapsed timer and paginates game history with replay', as
       }),
     )
     .toEqual({ seed: 'BENTO-HS00-0006', difficulty: 'gentle', moves: 0, modal: false });
+});
+
+test('keeps BGM across scenes and persists the night dimmer', async ({ page }) => {
+  const atmosphereState = () =>
+    page.evaluate(() => {
+      const atmosphere = (
+        window as unknown as {
+          __BENTOKU_GAME__: {
+            scene: {
+              getScene(key: string): {
+                currentTrackKey?: string;
+                children: { list: GameObjectState[] };
+              };
+            };
+          };
+        }
+      ).__BENTOKU_GAME__.scene.getScene('AtmosphereScene');
+      return {
+        track: atmosphere.currentTrackKey,
+        overlayAlpha: atmosphere.children.list.find((object) => object.name === 'night-overlay')
+          ?.alpha,
+      };
+    });
+
+  await expect.poll(atmosphereState).toMatchObject({ track: 'music_sunlit_puzzle' });
+  const settingsButton = await screenPoint(page, 1490, 54);
+  await page.mouse.click(settingsButton.x, settingsButton.y);
+  await expect.poll(() => sceneTexts(page)).toContain('Sunlit Puzzle');
+
+  const nextTrack = await screenPoint(page, 1005, 309);
+  await page.mouse.click(nextTrack.x, nextTrack.y);
+  await expect
+    .poll(atmosphereState, { timeout: SCENE_READY_TIMEOUT })
+    .toMatchObject({ track: 'music_paper_lantern_logic' });
+  await expect.poll(() => sceneTexts(page)).toContain('Paper Lantern Logic');
+
+  const nightSlider = await screenPoint(page, 836, 549);
+  await page.mouse.click(nightSlider.x, nightSlider.y);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const save = JSON.parse(localStorage.getItem('bentoku.save.v4') ?? '{}');
+        const atmosphere = (
+          window as unknown as {
+            __BENTOKU_GAME__: {
+              scene: { getScene(key: string): { children: { list: GameObjectState[] } } };
+            };
+          }
+        ).__BENTOKU_GAME__.scene.getScene('AtmosphereScene');
+        return {
+          nightDim: save.settings?.nightDim,
+          alpha: atmosphere.children.list.find((object) => object.name === 'night-overlay')?.alpha,
+        };
+      }),
+    )
+    .toEqual({ nightDim: 0.6, alpha: 0.27 });
+
+  const backToCafe = await screenPoint(page, 935, 781);
+  await page.mouse.click(backToCafe.x, backToCafe.y);
+  await expect
+    .poll(() => sceneTexts(page, 'MenuScene'), { timeout: SCENE_READY_TIMEOUT })
+    .toContain('Infinite');
+  expect(await atmosphereState()).toMatchObject({ track: 'music_paper_lantern_logic' });
+
+  await enterInfinite(page);
+  expect(await atmosphereState()).toEqual({
+    track: 'music_paper_lantern_logic',
+    overlayAlpha: 0.27,
+  });
+  await page.reload();
+  await enterInfinite(page);
+  await expect
+    .poll(atmosphereState, { timeout: SCENE_READY_TIMEOUT })
+    .toEqual({ track: 'music_paper_lantern_logic', overlayAlpha: 0.27 });
+});
+
+test('dismisses modal surfaces only from outside or Escape', async ({ page }) => {
+  const settingsButton = await screenPoint(page, 1490, 54);
+  await page.mouse.click(settingsButton.x, settingsButton.y);
+  await expect.poll(() => sceneTexts(page)).toContain('Settings');
+
+  const inside = await screenPoint(page, 800, 180);
+  await page.mouse.click(inside.x, inside.y);
+  await expect.poll(() => sceneTexts(page)).toContain('Settings');
+
+  const outside = await screenPoint(page, 120, 120);
+  await page.mouse.click(outside.x, outside.y);
+  await expect.poll(() => sceneTexts(page)).not.toContain('Settings');
+
+  const historyButton = await screenPoint(page, 790, 54);
+  await page.mouse.click(historyButton.x, historyButton.y);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Boolean(
+          (
+            window as unknown as {
+              __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+            }
+          ).__BENTOKU_GAME__.scene.getScene('PuzzleScene').modal,
+        ),
+      ),
+    )
+    .toBe(true);
+  await page.keyboard.press('Escape');
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Boolean(
+          (
+            window as unknown as {
+              __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+            }
+          ).__BENTOKU_GAME__.scene.getScene('PuzzleScene').modal,
+        ),
+      ),
+    )
+    .toBe(false);
 });
 
 test('keeps toolbar, settings actions, and partial clues inside their intended layout', async ({
@@ -764,13 +975,23 @@ test('keeps toolbar, settings actions, and partial clues inside their intended l
     return {
       anchorX: anchor?.x,
       averageX: partial.reduce((sum, clue) => sum + (clue.x ?? 0), 0) / partial.length,
+      clueGridCounts: [anchor, ...partial].map(
+        (clue) => clue?.list?.filter((object) => object.name === 'clue-grid').length ?? 0,
+      ),
+      clueCardCount: [anchor, ...partial].reduce(
+        (count, clue) =>
+          count + (clue?.list?.filter((object) => object.name === 'clue-card').length ?? 0),
+        0,
+      ),
       bottom:
         (panel.y ?? 0) + Math.max(...partial.map((clue) => (clue.y ?? 0) + (clue.height ?? 0) / 2)),
     };
   });
   expect(partialLayout.anchorX).toBe(-24);
   expect(partialLayout.averageX).toBe(-24);
-  expect(partialLayout.bottom).toBeLessThanOrEqual(755);
+  expect(partialLayout.clueGridCounts.every((count) => count === 1)).toBe(true);
+  expect(partialLayout.clueCardCount).toBe(0);
+  expect(partialLayout.bottom).toBeLessThanOrEqual(830);
 });
 
 test('lets the player switch deduction difficulty and preserves the choice', async ({ page }) => {
@@ -1026,7 +1247,7 @@ test('localizes Settings, difficulty guidance, and Help without translating leve
 }) => {
   const settingsButton = await screenPoint(page, 1490, 54);
   await page.mouse.click(settingsButton.x, settingsButton.y);
-  const languageButton = await screenPoint(page, 665, 701);
+  const languageButton = await screenPoint(page, 665, 781);
   await page.mouse.click(languageButton.x, languageButton.y);
 
   await expect
@@ -1099,6 +1320,15 @@ test('localizes Settings, difficulty guidance, and Help without translating leve
   expect(helpCopy).not.toContain('Намекнуть');
   expect(helpCopy).toContain('Обучение');
   expect(helpCopy).toContain('Открыть одну');
+  await page.keyboard.press('Escape');
+  await expect.poll(() => sceneTexts(page)).not.toContain('Обучение');
+
+  const historyButton = await screenPoint(page, 790, 54);
+  await page.mouse.click(historyButton.x, historyButton.y);
+  const historyCopy = await sceneTexts(page);
+  expect(historyCopy).toContain('История игр');
+  expect(historyCopy).toContain('Gentle');
+  expect(historyCopy).not.toContain('Спокойный');
 });
 
 test('starts Master Rush at 1:45 and removes Reveal from timed help', async ({ page }) => {
@@ -1108,27 +1338,31 @@ test('starts Master Rush at 1:45 and removes Reveal from timed help', async ({ p
   await page.mouse.click(startButton.x, startButton.y);
 
   const countdownValues: string[] = [];
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const state = await page.evaluate(() => {
-      const scene = (
-        window as unknown as {
-          __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+  await expect
+    .poll(
+      async () => {
+        const state = await page.evaluate(() => {
+          const scene = (
+            window as unknown as {
+              __BENTOKU_GAME__: { scene: { getScene(key: string): SceneState } };
+            }
+          ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
+          return {
+            values:
+              scene.countdown?.list
+                .map((object) => object.text)
+                .filter((text): text is string => typeof text === 'string') ?? [],
+            timerState: scene.timer?.state,
+          };
+        });
+        for (const value of state.values) {
+          if (countdownValues.at(-1) !== value) countdownValues.push(value);
         }
-      ).__BENTOKU_GAME__.scene.getScene('PuzzleScene');
-      return {
-        values:
-          scene.countdown?.list
-            .map((object) => object.text)
-            .filter((text): text is string => typeof text === 'string') ?? [],
-        timerState: scene.timer?.state,
-      };
-    });
-    for (const value of state.values) {
-      if (countdownValues.at(-1) !== value) countdownValues.push(value);
-    }
-    if (state.timerState === 'running') break;
-    await page.waitForTimeout(100);
-  }
+        return state.timerState === 'running';
+      },
+      { timeout: SCENE_READY_TIMEOUT, intervals: [100] },
+    )
+    .toBe(true);
   expect(countdownValues).toEqual(['3', '2', '1']);
 
   await expect
@@ -1147,7 +1381,7 @@ test('starts Master Rush at 1:45 and removes Reveal from timed help', async ({ p
             remainingMs: scene.timer?.remainingMs ?? 0,
           };
         }),
-      { timeout: 5000 },
+      { timeout: SCENE_READY_TIMEOUT },
     )
     .toMatchObject({ mode: 'timed', difficulty: 'master', state: 'running' });
 
@@ -1161,7 +1395,11 @@ test('starts Master Rush at 1:45 and removes Reveal from timed help', async ({ p
   });
   expect(remainingMs).toBeLessThanOrEqual(105_000);
   expect(remainingMs).toBeGreaterThan(100_000);
-  expect((await sceneTexts(page)).some((text) => /^TIME 1:4[45]$/.test(text))).toBe(true);
+  await expect
+    .poll(async () => (await sceneTexts(page)).some((text) => /^TIME 1:4[45]$/.test(text)), {
+      timeout: SCENE_READY_TIMEOUT,
+    })
+    .toBe(true);
 
   const helpButton = await screenPoint(page, 1426, 54);
   await page.mouse.click(helpButton.x, helpButton.y);

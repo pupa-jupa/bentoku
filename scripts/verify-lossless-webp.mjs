@@ -13,6 +13,17 @@ const pairs = [
 ];
 
 let failures = 0;
+
+const walk = async (directory) => {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map((entry) => {
+      const fullPath = path.join(directory, entry.name);
+      return entry.isDirectory() ? walk(fullPath) : [fullPath];
+    }),
+  );
+  return files.flat();
+};
 for (const [sourceDir, targetDir, include] of pairs) {
   const files = (await readdir(sourceDir))
     .filter((file) => /\.(png|jpe?g)$/i.test(file))
@@ -52,6 +63,16 @@ for (const [sourceDir, targetDir, include] of pairs) {
       `${okay ? 'PASS' : 'FAIL'} ${file}: ${source.info.width}x${source.info.height}, alpha diffs=${alphaDiffs}, visible RGB diffs=${visibleChannelDiffs}\n`,
     );
   }
+}
+
+for (const directory of process.argv.includes('--dist') ? ['public', 'dist'] : ['public']) {
+  const rawRuntimeImages = (await walk(directory)).filter((file) => /\.(png|jpe?g)$/i.test(file));
+  if (rawRuntimeImages.length > 0) {
+    failures += rawRuntimeImages.length;
+    rawRuntimeImages.forEach((file) =>
+      process.stdout.write(`FAIL runtime source raster: ${file}\n`),
+    );
+  } else process.stdout.write(`PASS ${directory}: no runtime PNG/JPG files\n`);
 }
 
 if (failures > 0) throw new Error(`${failures} lossless WebP verification(s) failed.`);

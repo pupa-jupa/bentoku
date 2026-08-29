@@ -12,8 +12,6 @@ import { campaignPlayContext } from '../game/playContext';
 import { I18nService } from '../i18n/I18nService';
 import type { TranslationKey } from '../i18n/translations';
 import { AudioService } from '../services/AudioService';
-import { musicAssets } from '../services/AssetRegistry';
-import { MusicService } from '../services/MusicService';
 import { SaveService } from '../services/SaveService';
 
 export class CampaignScene extends Phaser.Scene {
@@ -21,7 +19,6 @@ export class CampaignScene extends Phaser.Scene {
   private i18n!: I18nService;
   private english!: I18nService;
   private audio!: AudioService;
-  private music!: MusicService;
   private selectedChapter = 1;
   private selectedOrderId!: CampaignOrderId;
 
@@ -35,8 +32,6 @@ export class CampaignScene extends Phaser.Scene {
     this.i18n = new I18nService(settings.language);
     this.english = new I18nService('en');
     this.audio = new AudioService(this, settings);
-    this.music = new MusicService(this, musicAssets, settings.musicVolume);
-    this.music.start();
     const current = getCampaignOrder(this.save.selectedCampaignOrderId);
     this.selectedChapter = current.chapter;
     this.selectedOrderId = current.id;

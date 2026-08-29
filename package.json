@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "assets:build": "node scripts/build-runtime-assets.mjs",
     "assets:verify": "node scripts/verify-lossless-webp.mjs",
+    "assets:verify:dist": "node scripts/verify-lossless-webp.mjs --dist",
     "art:preview": "node scripts/capture-art-preview.mjs",
     "sfx:build": "node scripts/generate-sfx.mjs"
   },

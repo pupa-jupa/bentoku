@@ -9,11 +9,16 @@ export interface ClueOffset {
   y: number;
 }
 
+const offsetsCache = new Map<number, ClueOffset[]>();
 export const getClueOffsets = (clue: CluePattern): ClueOffset[] => {
+  const key = clue.width * 10 + clue.height;
+  const cached = offsetsCache.get(key);
+  if (cached) return cached;
   const offsets: ClueOffset[] = [];
   for (let y = 0; y <= 3 - clue.height; y += 1) {
     for (let x = 0; x <= 3 - clue.width; x += 1) offsets.push({ x, y });
   }
+  offsetsCache.set(key, offsets);
   return offsets;
 };
 

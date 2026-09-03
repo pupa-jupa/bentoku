@@ -203,7 +203,6 @@ export class PuzzleScene extends Phaser.Scene {
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
         document.removeEventListener('visibilitychange', this.visibilityHandler);
-      this.input.keyboard?.off('keydown', this.undoKeyHandler);
     });
   }
 

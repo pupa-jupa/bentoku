@@ -42,10 +42,10 @@ const matchingExists = (
       candidates.push([forced.piece]);
       continue;
     }
-    const cellCandidates = [];
+    const cellCandidates: PieceId[] = [];
     for (const piece of domains[cell]!) {
       if (allowed.has(piece) && piece !== forced?.piece) {
-        cellCandidates.push(piece);
+        cellCandidates.push(piece as PieceId);
       }
     }
     if (cellCandidates.length === 0) return false;
@@ -59,7 +59,8 @@ const matchingExists = (
   const assign = (cell: number): boolean => {
     const candidatesCell = candidates[cell]!;
     for (let i = 0; i < candidatesCell.length; i++) {
-      const piece = candidatesCell[i];
+      const piece = candidatesCell[i] as PieceId;
+      if (!piece) continue;
       if (visited.has(piece)) continue;
       visited.add(piece);
       const previousCell = pieceOwner.get(piece);
@@ -78,7 +79,7 @@ const matchingExists = (
 
   for (let i = 0; i < order.length; i++) {
     visited.clear();
-    if (!assign(order[i].cell)) return false;
+    if (!order[i] || !assign(order[i]!.cell)) return false;
   }
   return true;
 };
@@ -143,13 +144,17 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
     rounds += 1;
     const singletonBefore = domains.filter((domain) => domain.size === 1).length;
 
-    for (const state of offsetStates) {
+    for (let stateIdx = 0; stateIdx < offsetStates.length; stateIdx++) {
+      const state = offsetStates[stateIdx];
+      if (!state) continue;
       const surviving = [];
       for (let i = 0; i < state.offsets.length; i++) {
         const offset = state.offsets[i];
+        if (!offset) continue;
         let offsetMatches = true;
         for (let j = 0; j < state.clue.cells.length; j++) {
           const cell = state.clue.cells[j];
+          if (!cell) continue;
           if (!cell.animal && !cell.food) continue;
           const position = (cell.y + offset.y) * 3 + cell.x + offset.x;
           const domain = domains[position]!;
@@ -182,9 +187,11 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
         let supportedByEveryClue = true;
         for (let i = 0; i < offsetStates.length; i++) {
           const state = offsetStates[i];
+          if (!state) continue;
           let someOffsetSupported = false;
           for (let j = 0; j < state.offsets.length; j++) {
             const offset = state.offsets[j];
+            if (!offset) continue;
             const descriptor = descriptorAt(state.clue, offset, position);
             if (
               !descriptor ||

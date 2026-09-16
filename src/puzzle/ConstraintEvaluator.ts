@@ -29,6 +29,7 @@ export const clueCouldMatch = (
       let match = true;
       for (let i = 0; i < clue.cells.length; i++) {
         const cell = clue.cells[i];
+        if (!cell) continue;
         const pieceId = board[(cell.y + y) * 3 + cell.x + x];
         if (!pieceId || (!cell.animal && !cell.food)) continue;
         const piece = pieceMap.get(pieceId);
@@ -53,6 +54,7 @@ export const clueMatchesBoard = (
       let match = true;
       for (let i = 0; i < clue.cells.length; i++) {
         const cell = clue.cells[i];
+        if (!cell) continue;
         if (!cell.animal && !cell.food) continue;
         const pieceId = board[(cell.y + y) * 3 + cell.x + x];
         if (!pieceId) {

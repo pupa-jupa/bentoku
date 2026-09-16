@@ -36,24 +36,34 @@ const matchingExists = (
   if (forced && (!allowed.has(forced.piece) || !domains[forced.cell]!.has(forced.piece)))
     return false;
 
-  const candidates = domains.map((domain, cell) => {
-    if (forced?.cell === cell) return [forced.piece];
-    return [...domain].filter((piece) => allowed.has(piece) && piece !== forced?.piece);
-  });
-  if (candidates.some((items) => items.length === 0)) return false;
+  const candidates: PieceId[][] = [];
+  for (let cell = 0; cell < 9; cell++) {
+    if (forced?.cell === cell) {
+      candidates.push([forced.piece]);
+      continue;
+    }
+    const cellCandidates = [];
+    for (const piece of domains[cell]!) {
+      if (allowed.has(piece) && piece !== forced?.piece) {
+        cellCandidates.push(piece);
+      }
+    }
+    if (cellCandidates.length === 0) return false;
+    candidates.push(cellCandidates);
+  }
 
-  const order = candidates
-    .map((items, cell) => ({ cell, size: items.length }))
-    .sort((first, second) => first.size - second.size)
-    .map(({ cell }) => cell);
+  // Pre-allocate the visited set so we don't recreate it for every assignment
+  const visited = new Set<PieceId>();
   const pieceOwner = new Map<PieceId, number>();
 
-  const assign = (cell: number, visited: Set<PieceId>): boolean => {
-    for (const piece of candidates[cell]!) {
+  const assign = (cell: number): boolean => {
+    const candidatesCell = candidates[cell]!;
+    for (let i = 0; i < candidatesCell.length; i++) {
+      const piece = candidatesCell[i];
       if (visited.has(piece)) continue;
       visited.add(piece);
       const previousCell = pieceOwner.get(piece);
-      if (previousCell === undefined || assign(previousCell, visited)) {
+      if (previousCell === undefined || assign(previousCell)) {
         pieceOwner.set(piece, cell);
         return true;
       }
@@ -61,7 +71,16 @@ const matchingExists = (
     return false;
   };
 
-  return order.every((cell) => assign(cell, new Set()));
+  // Sort by fewest candidates first for faster failure
+  const order = candidates
+    .map((items, cell) => ({ cell, size: items.length }))
+    .sort((first, second) => first.size - second.size);
+
+  for (let i = 0; i < order.length; i++) {
+    visited.clear();
+    if (!assign(order[i].cell)) return false;
+  }
+  return true;
 };
 
 const descriptorAt = (clue: CluePattern, offset: { x: number; y: number }, position: number) => {
@@ -107,8 +126,15 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
   let rounds = 0;
   let changed = true;
 
-  const piecesForOmittedAnimal = (omittedAnimal: Animal): PieceId[] =>
-    puzzle.pieces.filter((piece) => piece.animal !== omittedAnimal).map((piece) => piece.id);
+  const memoPiecesForOmittedAnimal = new Map<Animal, PieceId[]>();
+  const piecesForOmittedAnimal = (omittedAnimal: Animal): PieceId[] => {
+    let result = memoPiecesForOmittedAnimal.get(omittedAnimal);
+    if (!result) {
+      result = puzzle.pieces.filter((piece) => piece.animal !== omittedAnimal).map((piece) => piece.id);
+      memoPiecesForOmittedAnimal.set(omittedAnimal, result);
+    }
+    return result;
+  };
 
   while (changed && rounds < 50 && domains.every((domain) => domain.size > 0)) {
     changed = false;
@@ -116,15 +142,31 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
     const singletonBefore = domains.filter((domain) => domain.size === 1).length;
 
     for (const state of offsetStates) {
-      const surviving = state.offsets.filter((offset) =>
-        state.clue.cells.every((cell) => {
-          if (!cell.animal && !cell.food) return true;
+      const surviving = [];
+      for (let i = 0; i < state.offsets.length; i++) {
+        const offset = state.offsets[i];
+        let offsetMatches = true;
+        for (let j = 0; j < state.clue.cells.length; j++) {
+          const cell = state.clue.cells[j];
+          if (!cell.animal && !cell.food) continue;
           const position = (cell.y + offset.y) * 3 + cell.x + offset.x;
-          return [...domains[position]!].some((pieceId) =>
-            pieceMatchesCell(pieceMap.get(pieceId)!, cell),
-          );
-        }),
-      );
+          const domain = domains[position]!;
+          let cellMatches = false;
+          for (const pieceId of domain) {
+            if (pieceMatchesCell(pieceMap.get(pieceId)!, cell)) {
+              cellMatches = true;
+              break;
+            }
+          }
+          if (!cellMatches) {
+            offsetMatches = false;
+            break;
+          }
+        }
+        if (offsetMatches) {
+          surviving.push(offset);
+        }
+      }
       if (surviving.length !== state.offsets.length) {
         clueOffsetEliminations += state.offsets.length - surviving.length;
         state.offsets = surviving;
@@ -135,16 +177,23 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
     for (let position = 0; position < 9; position += 1) {
       for (const pieceId of [...domains[position]!]) {
         const piece = pieceMap.get(pieceId)!;
-        const supportedByEveryClue = offsetStates.every((state) =>
-          state.offsets.some((offset) => {
+        let supportedByEveryClue = true;
+        for (let i = 0; i < offsetStates.length; i++) {
+          const state = offsetStates[i];
+          let someOffsetSupported = false;
+          for (let j = 0; j < state.offsets.length; j++) {
+            const offset = state.offsets[j];
             const descriptor = descriptorAt(state.clue, offset, position);
-            return (
-              !descriptor ||
-              (!descriptor.animal && !descriptor.food) ||
-              pieceMatchesCell(piece, descriptor)
-            );
-          }),
-        );
+            if (!descriptor || (!descriptor.animal && !descriptor.food) || pieceMatchesCell(piece, descriptor)) {
+              someOffsetSupported = true;
+              break;
+            }
+          }
+          if (!someOffsetSupported) {
+            supportedByEveryClue = false;
+            break;
+          }
+        }
         if (!supportedByEveryClue) {
           domains[position]!.delete(pieceId);
           candidateEliminations += 1;

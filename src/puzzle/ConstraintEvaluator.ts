@@ -19,8 +19,6 @@ export const getClueOffsets = (clue: CluePattern): ClueOffset[] => {
   return offsets;
 };
 
-
-
 export const clueCouldMatch = (
   board: Board,
   clue: CluePattern,

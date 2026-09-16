@@ -130,7 +130,9 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
   const piecesForOmittedAnimal = (omittedAnimal: Animal): PieceId[] => {
     let result = memoPiecesForOmittedAnimal.get(omittedAnimal);
     if (!result) {
-      result = puzzle.pieces.filter((piece) => piece.animal !== omittedAnimal).map((piece) => piece.id);
+      result = puzzle.pieces
+        .filter((piece) => piece.animal !== omittedAnimal)
+        .map((piece) => piece.id);
       memoPiecesForOmittedAnimal.set(omittedAnimal, result);
     }
     return result;
@@ -184,7 +186,11 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
           for (let j = 0; j < state.offsets.length; j++) {
             const offset = state.offsets[j];
             const descriptor = descriptorAt(state.clue, offset, position);
-            if (!descriptor || (!descriptor.animal && !descriptor.food) || pieceMatchesCell(piece, descriptor)) {
+            if (
+              !descriptor ||
+              (!descriptor.animal && !descriptor.food) ||
+              pieceMatchesCell(piece, descriptor)
+            ) {
               someOffsetSupported = true;
               break;
             }

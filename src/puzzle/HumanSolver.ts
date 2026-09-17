@@ -157,7 +157,11 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
           for (let j = 0; j < state.offsets.length; j++) {
             const offset = state.offsets[j]!;
             const descriptor = descriptorAt(state.clue, offset, position);
-            if (!descriptor || (!descriptor.animal && !descriptor.food) || pieceMatchesCell(piece, descriptor)) {
+            if (
+              !descriptor ||
+              (!descriptor.animal && !descriptor.food) ||
+              pieceMatchesCell(piece, descriptor)
+            ) {
               supportedByThisClue = true;
               break;
             }
@@ -187,7 +191,12 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
       for (const pieceId of [...domains[position]!]) {
         let hasFamilySupport = false;
         for (const omittedAnimal of omittedAnimalCandidates) {
-          if (matchingExists(domains, piecesForOmittedAnimal(omittedAnimal), { cell: position, piece: pieceId })) {
+          if (
+            matchingExists(domains, piecesForOmittedAnimal(omittedAnimal), {
+              cell: position,
+              piece: pieceId,
+            })
+          ) {
             hasFamilySupport = true;
             break;
           }

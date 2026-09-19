@@ -28,6 +28,7 @@ const copyKeys: Record<TutorialStep, { title: TranslationKey; body: TranslationK
 
 export class TutorialView {
   private container?: Phaser.GameObjects.Container;
+  private keyboardCleanup?: () => void;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -44,6 +45,20 @@ export class TutorialView {
   ): void {
     this.destroy();
     const container = this.scene.add.container(0, 0).setDepth(4200);
+
+    const onKeydown = (event: KeyboardEvent): void => {
+      if (event.code === 'Space' || event.code === 'Enter') {
+        if (showContinue) {
+          event.preventDefault();
+          this.onContinue();
+        }
+      } else if (event.code === 'Escape') {
+        event.preventDefault();
+        this.onSkip();
+      }
+    };
+    this.scene.input.keyboard?.on('keydown', onKeydown);
+    this.keyboardCleanup = () => this.scene.input.keyboard?.off('keydown', onKeydown);
     const shade = this.scene.add.rectangle(800, 450, 1600, 900, COLORS.walnut, 0.24);
     container.add(shade);
 
@@ -192,6 +207,8 @@ export class TutorialView {
   }
 
   destroy(): void {
+    this.keyboardCleanup?.();
+    this.keyboardCleanup = undefined;
     this.container?.destroy(true);
     this.container = undefined;
   }

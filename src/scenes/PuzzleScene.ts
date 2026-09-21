@@ -456,6 +456,8 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private bindInput(): void {
+    this.input.keyboard?.on('keydown-Z', () => this.undo());
+    this.input.keyboard?.on('keydown-U', () => this.undo());
     this.input.once('pointerdown', () =>
       getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume),
     );

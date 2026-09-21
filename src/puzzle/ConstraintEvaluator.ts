@@ -29,7 +29,7 @@ export const clueCouldMatch = (
     for (let offsetX = 0; offsetX <= maxX; offsetX += 1) {
       let offsetMatches = true;
       for (let i = 0; i < clue.cells.length; i += 1) {
-        const cell = clue.cells[i];
+        const cell = clue.cells[i] as ClueCell;
         const pos = (cell.y + offsetY) * 3 + cell.x + offsetX;
         const pieceId = board[pos];
         if (!pieceId || (!cell.animal && !cell.food)) continue;
@@ -57,7 +57,7 @@ export const clueMatchesBoard = (
     for (let offsetX = 0; offsetX <= maxX; offsetX += 1) {
       let offsetMatches = true;
       for (let i = 0; i < clue.cells.length; i += 1) {
-        const cell = clue.cells[i];
+        const cell = clue.cells[i] as ClueCell;
         if (!cell.animal && !cell.food) continue;
         const pos = (cell.y + offsetY) * 3 + cell.x + offsetX;
         const pieceId = board[pos];
@@ -83,7 +83,7 @@ export const boardSatisfiesPuzzle = (
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
 ): boolean => {
   for (let i = 0; i < clues.length; i += 1) {
-    if (!clueMatchesBoard(board, clues[i], pieceMap)) return false;
+    if (!clueMatchesBoard(board, clues[i] as CluePattern, pieceMap)) return false;
   }
   return true;
 };

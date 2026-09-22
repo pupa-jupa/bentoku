@@ -1395,12 +1395,10 @@ export class PuzzleScene extends Phaser.Scene {
       : [];
     return [
       ...current,
-      ...this.save.gameHistory.map(
-        (entry): HistoryGameRow => ({
-          ...(entry as GameHistoryEntry),
-          current: false,
-        }),
-      ),
+      ...this.save.gameHistory.map((entry): HistoryGameRow => ({
+        ...(entry as GameHistoryEntry),
+        current: false,
+      })),
     ];
   }
 

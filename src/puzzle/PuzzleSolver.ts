@@ -31,7 +31,13 @@ const pieceAllowedAt = (
   piece: BentoPiece,
   position: number,
   descriptors: readonly ClueCell[][],
-): boolean => descriptors[position]!.every((descriptor) => pieceMatchesCell(piece, descriptor));
+): boolean => {
+  const cellDescriptors = descriptors[position]!;
+  for (let i = 0; i < cellDescriptors.length; i += 1) {
+    if (!pieceMatchesCell(piece, cellDescriptors[i]!)) return false;
+  }
+  return true;
+};
 
 const solveForAnimals = (
   puzzle: SolverPuzzle,
@@ -68,8 +74,12 @@ const solveForAnimals = (
     }
   }
 
-  const allCluesPossible = (): boolean =>
-    puzzle.clues.every((clue) => clueCouldMatch(board, clue, pieceMap));
+  const allCluesPossible = (): boolean => {
+    for (let i = 0; i < puzzle.clues.length; i += 1) {
+      if (!clueCouldMatch(board, puzzle.clues[i]!, pieceMap)) return false;
+    }
+    return true;
+  };
 
   const candidatesFor = (position: number): BentoPiece[] =>
     availablePieces.filter(

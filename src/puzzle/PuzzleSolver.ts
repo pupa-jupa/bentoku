@@ -31,7 +31,13 @@ const pieceAllowedAt = (
   piece: BentoPiece,
   position: number,
   descriptors: readonly ClueCell[][],
-): boolean => descriptors[position]!.every((descriptor) => pieceMatchesCell(piece, descriptor));
+): boolean => {
+  const cellDescriptors = descriptors[position]!;
+  for (let i = 0; i < cellDescriptors.length; i += 1) {
+    if (!pieceMatchesCell(piece, cellDescriptors[i]!)) return false;
+  }
+  return true;
+};
 
 const solveForAnimals = (
   puzzle: SolverPuzzle,
@@ -40,11 +46,21 @@ const solveForAnimals = (
   initialBoard: Board,
 ): SolveResult => {
   const includedAnimalSet = new Set(includedAnimals);
-  const availablePieces = puzzle.pieces.filter((piece) => includedAnimalSet.has(piece.animal));
+  const availablePieces: BentoPiece[] = [];
+  for (let i = 0; i < puzzle.pieces.length; i += 1) {
+    if (includedAnimalSet.has(puzzle.pieces[i]!.animal)) availablePieces.push(puzzle.pieces[i]!);
+  }
   const pieceMap = createPieceMap(puzzle.pieces);
   const descriptors = anchoredDescriptors(puzzle);
   const board = toBoard(initialBoard);
-  const used = new Set<PieceId>(board.filter((cell): cell is PieceId => cell !== null));
+  const used = new Set<PieceId>();
+  let initialUsedCount = 0;
+  for (let i = 0; i < board.length; i += 1) {
+    if (board[i] !== null) {
+      used.add(board[i] as PieceId);
+      initialUsedCount += 1;
+    }
+  }
   const metrics: SolveMetrics = {
     exploredStates: 0,
     maxDepth: 0,
@@ -54,7 +70,7 @@ const solveForAnimals = (
   let count = 0;
   let firstSolution: Board | undefined;
 
-  if (used.size !== board.filter(Boolean).length) return { count: 0, metrics };
+  if (used.size !== initialUsedCount) return { count: 0, metrics };
   for (let position = 0; position < 9; position += 1) {
     const pieceId = board[position];
     if (!pieceId) continue;
@@ -68,13 +84,23 @@ const solveForAnimals = (
     }
   }
 
-  const allCluesPossible = (): boolean =>
-    puzzle.clues.every((clue) => clueCouldMatch(board, clue, pieceMap));
+  const allCluesPossible = (): boolean => {
+    for (let i = 0; i < puzzle.clues.length; i += 1) {
+      if (!clueCouldMatch(board, puzzle.clues[i]!, pieceMap)) return false;
+    }
+    return true;
+  };
 
-  const candidatesFor = (position: number): BentoPiece[] =>
-    availablePieces.filter(
-      (piece) => !used.has(piece.id) && pieceAllowedAt(piece, position, descriptors),
-    );
+  const candidatesFor = (position: number): BentoPiece[] => {
+    const result: BentoPiece[] = [];
+    for (let i = 0; i < availablePieces.length; i += 1) {
+      const piece = availablePieces[i]!;
+      if (!used.has(piece.id) && pieceAllowedAt(piece, position, descriptors)) {
+        result.push(piece);
+      }
+    }
+    return result;
+  };
 
   const search = (depth: number): void => {
     if (count >= limit) return;
@@ -115,7 +141,11 @@ const solveForAnimals = (
     }
   };
 
-  if (allCluesPossible()) search(board.filter(Boolean).length);
+  let currentBoardCount = 0;
+  for (let i = 0; i < board.length; i += 1) {
+    if (board[i] !== null) currentBoardCount += 1;
+  }
+  if (allCluesPossible()) search(currentBoardCount);
   return { count, firstSolution, metrics };
 };
 
@@ -140,7 +170,10 @@ export const solvePuzzle = (
 
   for (const omittedAnimal of ANIMALS) {
     if (count >= limit) break;
-    const includedAnimals = ANIMALS.filter((animal) => animal !== omittedAnimal);
+    const includedAnimals: Animal[] = [];
+    for (let i = 0; i < ANIMALS.length; i += 1) {
+      if (ANIMALS[i] !== omittedAnimal) includedAnimals.push(ANIMALS[i]!);
+    }
     const result = solveForAnimals(puzzle, includedAnimals, limit - count, initialBoard);
     count += result.count;
     firstSolution ??= result.firstSolution;

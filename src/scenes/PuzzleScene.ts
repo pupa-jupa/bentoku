@@ -203,6 +203,7 @@ export class PuzzleScene extends Phaser.Scene {
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
         document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.input.keyboard?.off('keydown', this.keyboardShortcutHandler);
     });
   }
 
@@ -212,6 +213,13 @@ export class PuzzleScene extends Phaser.Scene {
     this.updateTimerDisplay();
     if (this.timer.state === 'expired') this.handleTimedOut();
   }
+
+  private readonly keyboardShortcutHandler = (event: KeyboardEvent): void => {
+    if (this.modal || document.activeElement?.tagName === 'INPUT') return;
+    if (event.key.toLowerCase() === 'u' || (event.key.toLowerCase() === 'z' && (event.ctrlKey || event.metaKey))) {
+      this.undo();
+    }
+  };
 
   private createPuzzle(
     seed: string,
@@ -456,6 +464,7 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private bindInput(): void {
+    this.input.keyboard?.on('keydown', this.keyboardShortcutHandler);
     this.input.once('pointerdown', () =>
       getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume),
     );

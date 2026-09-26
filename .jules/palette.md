@@ -1,3 +1,4 @@
 ## 2024-09-26 - Keyboard Shortcuts in Phaser Canvas UI
+
 **Learning:** Adding text hints to fixed-width icon buttons in a Phaser canvas UI can break the layout due to a lack of automatic CSS reflow. Accessibility and UX for shortcuts in these environments must rely on silent keyboard event listeners (e.g., `keydown-U`) instead of attempting to modify canvas element dimensions to include visual shortcuts. Always verify that no modals are active and inputs aren't focused to prevent unintended triggers.
 **Action:** Use silent keyboard event listeners for canvas game shortcuts rather than modifying visual UI components, making sure to clean up the listeners in `SHUTDOWN` events and checking for focused inputs/modals.

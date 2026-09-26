@@ -216,7 +216,10 @@ export class PuzzleScene extends Phaser.Scene {
 
   private readonly keyboardShortcutHandler = (event: KeyboardEvent): void => {
     if (this.modal || document.activeElement?.tagName === 'INPUT') return;
-    if (event.key.toLowerCase() === 'u' || (event.key.toLowerCase() === 'z' && (event.ctrlKey || event.metaKey))) {
+    if (
+      event.key.toLowerCase() === 'u' ||
+      (event.key.toLowerCase() === 'z' && (event.ctrlKey || event.metaKey))
+    ) {
       this.undo();
     }
   };

@@ -31,7 +31,14 @@ const pieceAllowedAt = (
   piece: BentoPiece,
   position: number,
   descriptors: readonly ClueCell[][],
-): boolean => descriptors[position]!.every((descriptor) => pieceMatchesCell(piece, descriptor));
+): boolean => {
+  const cellDescriptors = descriptors[position]!;
+  // ⚡ Bolt: Using for loop instead of .every to avoid closure allocation in hot path
+  for (let i = 0; i < cellDescriptors.length; i += 1) {
+    if (!pieceMatchesCell(piece, cellDescriptors[i]!)) return false;
+  }
+  return true;
+};
 
 const solveForAnimals = (
   puzzle: SolverPuzzle,
@@ -68,13 +75,25 @@ const solveForAnimals = (
     }
   }
 
-  const allCluesPossible = (): boolean =>
-    puzzle.clues.every((clue) => clueCouldMatch(board, clue, pieceMap));
+  const allCluesPossible = (): boolean => {
+    // ⚡ Bolt: Using for loop instead of .every to avoid closure allocation in hot path
+    for (let i = 0; i < puzzle.clues.length; i += 1) {
+      if (!clueCouldMatch(board, puzzle.clues[i]!, pieceMap)) return false;
+    }
+    return true;
+  };
 
-  const candidatesFor = (position: number): BentoPiece[] =>
-    availablePieces.filter(
-      (piece) => !used.has(piece.id) && pieceAllowedAt(piece, position, descriptors),
-    );
+  const candidatesFor = (position: number): BentoPiece[] => {
+    // ⚡ Bolt: Using for loop instead of .filter to avoid closure allocation in hot path
+    const candidates: BentoPiece[] = [];
+    for (let i = 0; i < availablePieces.length; i += 1) {
+      const piece = availablePieces[i]!;
+      if (!used.has(piece.id) && pieceAllowedAt(piece, position, descriptors)) {
+        candidates.push(piece);
+      }
+    }
+    return candidates;
+  };
 
   const search = (depth: number): void => {
     if (count >= limit) return;

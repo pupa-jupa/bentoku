@@ -17,40 +17,71 @@ export const getClueOffsets = (clue: CluePattern): ClueOffset[] => {
   return offsets;
 };
 
-const positionAt = (cell: ClueCell, offset: ClueOffset): number =>
-  (cell.y + offset.y) * 3 + cell.x + offset.x;
-
+// Using traditional loops over array methods for hot-path performance
 export const clueCouldMatch = (
   board: Board,
   clue: CluePattern,
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean =>
-  getClueOffsets(clue).some((offset) =>
-    clue.cells.every((cell) => {
-      const pieceId = board[positionAt(cell, offset)];
-      if (!pieceId || (!cell.animal && !cell.food)) return true;
-      const piece = pieceMap.get(pieceId);
-      return piece ? pieceMatchesCell(piece, cell) : false;
-    }),
-  );
+): boolean => {
+  const limitY = 3 - clue.height;
+  const limitX = 3 - clue.width;
+  for (let offsetY = 0; offsetY <= limitY; offsetY++) {
+    for (let offsetX = 0; offsetX <= limitX; offsetX++) {
+      let match = true;
+      for (let i = 0; i < clue.cells.length; i++) {
+        const cell = clue.cells[i]!;
+        const pieceId = board[(cell.y + offsetY) * 3 + cell.x + offsetX];
+        if (!pieceId || (!cell.animal && !cell.food)) continue;
+        const piece = pieceMap.get(pieceId);
+        if (!piece || !pieceMatchesCell(piece, cell)) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return true;
+    }
+  }
+  return false;
+};
 
+// Using traditional loops over array methods for hot-path performance
 export const clueMatchesBoard = (
   board: Board,
   clue: CluePattern,
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean =>
-  getClueOffsets(clue).some((offset) =>
-    clue.cells.every((cell) => {
-      if (!cell.animal && !cell.food) return true;
-      const pieceId = board[positionAt(cell, offset)];
-      if (!pieceId) return false;
-      const piece = pieceMap.get(pieceId);
-      return piece ? pieceMatchesCell(piece, cell) : false;
-    }),
-  );
+): boolean => {
+  const limitY = 3 - clue.height;
+  const limitX = 3 - clue.width;
+  for (let offsetY = 0; offsetY <= limitY; offsetY++) {
+    for (let offsetX = 0; offsetX <= limitX; offsetX++) {
+      let match = true;
+      for (let i = 0; i < clue.cells.length; i++) {
+        const cell = clue.cells[i]!;
+        if (!cell.animal && !cell.food) continue;
+        const pieceId = board[(cell.y + offsetY) * 3 + cell.x + offsetX];
+        if (!pieceId) {
+          match = false;
+          break;
+        }
+        const piece = pieceMap.get(pieceId);
+        if (!piece || !pieceMatchesCell(piece, cell)) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return true;
+    }
+  }
+  return false;
+};
 
 export const boardSatisfiesPuzzle = (
   board: Board,
   clues: readonly CluePattern[],
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean => clues.every((clue) => clueMatchesBoard(board, clue, pieceMap));
+): boolean => {
+  for (let i = 0; i < clues.length; i++) {
+    if (!clueMatchesBoard(board, clues[i]!, pieceMap)) return false;
+  }
+  return true;
+};

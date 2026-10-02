@@ -29,7 +29,7 @@ export const clueCouldMatch = (
   // to avoid closure allocation bottlenecks during puzzle generation.
   const offsets = getClueOffsets(clue);
   for (let i = 0; i < offsets.length; i += 1) {
-    const offset = offsets[i];
+    const offset = offsets[i]!;
     let allMatch = true;
     for (let j = 0; j < clue.cells.length; j += 1) {
       const cell = clue.cells[j]!;
@@ -55,7 +55,7 @@ export const clueMatchesBoard = (
   // to avoid closure allocation bottlenecks during puzzle generation.
   const offsets = getClueOffsets(clue);
   for (let i = 0; i < offsets.length; i += 1) {
-    const offset = offsets[i];
+    const offset = offsets[i]!;
     let allMatch = true;
     for (let j = 0; j < clue.cells.length; j += 1) {
       const cell = clue.cells[j]!;

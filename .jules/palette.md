@@ -1,3 +1,4 @@
 ## 2026-10-03 - [Add Undo Keyboard Shortcut in Canvas-based UI]
+
 **Learning:** Adding keyboard shortcuts for canvas-based static UI elements requires careful consideration in Phaser. Specifically, shortcuts should be attached via silent `keydown` listeners without altering the visual fixed layout. We also must ensure shortcuts don't fire when modals are open (`this.modal`) or when HTML inputs are active (`document.activeElement.tagName === 'INPUT'`). It's also critical to unbind these listeners on scene `SHUTDOWN` to prevent memory leaks.
 **Action:** When adding keyboard shortcuts in Phaser games, always check for active modals and focused inputs before triggering the action, and always perform cleanup in the scene `SHUTDOWN` event listener.

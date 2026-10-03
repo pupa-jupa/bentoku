@@ -198,7 +198,9 @@ export class PuzzleScene extends Phaser.Scene {
     if (!firstVisit) this.announce(this.i18n.t('announce.ready'));
     this.visibilityHandler = () => this.handleVisibilityChange();
     document.addEventListener('visibilitychange', this.visibilityHandler);
+    this.input.keyboard?.on('keydown-U', this.handleUndoShortcut);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown-U', this.handleUndoShortcut);
       this.elapsedTimer.pause();
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
@@ -637,6 +639,11 @@ export class PuzzleScene extends Phaser.Scene {
       }),
     );
   }
+
+  private handleUndoShortcut = (): void => {
+    if (this.modal || document.activeElement?.tagName === 'INPUT') return;
+    this.undo();
+  };
 
   private undo(): void {
     if (

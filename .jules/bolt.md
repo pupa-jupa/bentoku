@@ -1,0 +1,3 @@
+## 2025-01-09 - Replacing functional array methods with nested for loops in hot paths
+**Learning:** In Phaser/TypeScript high-frequency hot paths (like puzzle constraint resolution solvers), replacing \`.some()\` and \`.every()\` methods that allocate closures at every iteration with traditional \`for\` loops yields measurable performance stability and prevents massive closure allocation bottlenecks. This reduces GC pauses on the event loop significantly during puzzle generation.
+**Action:** Avoid functional array methods inside deeply nested \`while\` solver loops and \`every/some\` puzzle evaluator methods, using raw \`for\` loops with \`break\` or \`continue\` instead when generating large arrays of puzzle states.

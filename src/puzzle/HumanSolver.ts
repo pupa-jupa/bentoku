@@ -115,16 +115,33 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
     rounds += 1;
     const singletonBefore = domains.filter((domain) => domain.size === 1).length;
 
+    // PERFORMANCE OPTIMIZATION:
+    // Avoiding functional array methods (filter, some, every) and array spread syntax
+    // in this high-frequency hot path to eliminate massive closure/memory allocations
+    // and subsequent garbage collection pauses.
     for (const state of offsetStates) {
-      const surviving = state.offsets.filter((offset) =>
-        state.clue.cells.every((cell) => {
-          if (!cell.animal && !cell.food) return true;
+      const surviving: Array<{ x: number; y: number }> = [];
+      for (let i = 0; i < state.offsets.length; i += 1) {
+        const offset = state.offsets[i]!;
+        let matchForOffset = true;
+        for (let j = 0; j < state.clue.cells.length; j += 1) {
+          const cell = state.clue.cells[j]!;
+          if (!cell.animal && !cell.food) continue;
           const position = (cell.y + offset.y) * 3 + cell.x + offset.x;
-          return [...domains[position]!].some((pieceId) =>
-            pieceMatchesCell(pieceMap.get(pieceId)!, cell),
-          );
-        }),
-      );
+          let cellMatch = false;
+          for (const pieceId of domains[position]!) {
+            if (pieceMatchesCell(pieceMap.get(pieceId)!, cell)) {
+              cellMatch = true;
+              break;
+            }
+          }
+          if (!cellMatch) {
+            matchForOffset = false;
+            break;
+          }
+        }
+        if (matchForOffset) surviving.push(offset);
+      }
       if (surviving.length !== state.offsets.length) {
         clueOffsetEliminations += state.offsets.length - surviving.length;
         state.offsets = surviving;
@@ -135,16 +152,28 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
     for (let position = 0; position < 9; position += 1) {
       for (const pieceId of [...domains[position]!]) {
         const piece = pieceMap.get(pieceId)!;
-        const supportedByEveryClue = offsetStates.every((state) =>
-          state.offsets.some((offset) => {
+        let supportedByEveryClue = true;
+        for (let i = 0; i < offsetStates.length; i += 1) {
+          const state = offsetStates[i]!;
+          let supportedByThisClue = false;
+          for (let j = 0; j < state.offsets.length; j += 1) {
+            const offset = state.offsets[j]!;
             const descriptor = descriptorAt(state.clue, offset, position);
-            return (
+            if (
               !descriptor ||
               (!descriptor.animal && !descriptor.food) ||
               pieceMatchesCell(piece, descriptor)
-            );
-          }),
-        );
+            ) {
+              supportedByThisClue = true;
+              break;
+            }
+          }
+          if (!supportedByThisClue) {
+            supportedByEveryClue = false;
+            break;
+          }
+        }
+
         if (!supportedByEveryClue) {
           domains[position]!.delete(pieceId);
           candidateEliminations += 1;

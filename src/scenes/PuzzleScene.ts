@@ -456,6 +456,19 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private bindInput(): void {
+    const handleUndoShortcut = (event: KeyboardEvent) => {
+      if (this.modal || document.activeElement?.tagName === 'INPUT' || event.repeat) return;
+      this.undo();
+    };
+
+    this.input.keyboard?.on('keydown-U', handleUndoShortcut);
+    this.input.keyboard?.on('keydown-Z', handleUndoShortcut);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown-U', handleUndoShortcut);
+      this.input.keyboard?.off('keydown-Z', handleUndoShortcut);
+    });
+
     this.input.once('pointerdown', () =>
       getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume),
     );

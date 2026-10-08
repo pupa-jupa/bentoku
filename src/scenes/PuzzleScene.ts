@@ -457,12 +457,7 @@ export class PuzzleScene extends Phaser.Scene {
 
   private bindInput(): void {
     const handleUndoShortcut = (event: KeyboardEvent) => {
-      if (
-        this.modal ||
-        document.activeElement?.tagName === 'INPUT' ||
-        event.repeat
-      )
-        return;
+      if (this.modal || document.activeElement?.tagName === 'INPUT' || event.repeat) return;
       this.undo();
     };
 

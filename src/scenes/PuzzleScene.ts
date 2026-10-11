@@ -129,6 +129,11 @@ export class PuzzleScene extends Phaser.Scene {
   private launchContext?: PlayContext;
   private pendingCampaignContext?: PlayContext;
   private trackListenerCleanup?: () => void;
+  private readonly undoKeyHandler = (event: KeyboardEvent): void => {
+    if (event.repeat || this.modal || document.activeElement?.tagName === 'INPUT') return;
+    event.preventDefault();
+    this.undo();
+  };
 
   constructor() {
     super('PuzzleScene');
@@ -203,6 +208,7 @@ export class PuzzleScene extends Phaser.Scene {
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
         document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.input.keyboard?.off('keydown-U', this.undoKeyHandler);
     });
   }
 
@@ -456,6 +462,7 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private bindInput(): void {
+    this.input.keyboard?.on('keydown-U', this.undoKeyHandler);
     this.input.once('pointerdown', () =>
       getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume),
     );

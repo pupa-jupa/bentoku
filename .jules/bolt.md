@@ -1,3 +1,4 @@
 ## 2025-02-13 - Optimize Array Operations in Constraint Evaluator
+
 **Learning:** Functional array methods like `.every()` and `.some()`, as well as intermediate allocations like `.filter()`, are extremely detrimental in tight constraint solver loops (e.g., `src/puzzle/ConstraintEvaluator.ts`). They allocate closures and arrays that trigger frequent garbage collection, slowing down hot paths significantly.
 **Action:** When working in constraint solving or puzzle generation modules, stick strictly to standard `for` loops and inline index iteration instead of functional array chaining, to avoid hidden memory allocations.

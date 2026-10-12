@@ -1,3 +1,4 @@
 ## 2025-03-09 - Keyboard Shortcuts for Icon Buttons in Canvas Games
+
 **Learning:** Adding keyboard shortcuts to interactive canvas scenes (like Phaser) can greatly improve accessibility for mouse-averse users, especially when fixed-width layout constraints prevent visible text hints from being added directly to icon-only buttons.
 **Action:** When implementing keyboard event listeners for UI actions (e.g., undo, settings, help), use silent global `keydown` event listeners combined with proper context checks (e.g., avoiding overlapping with form inputs, modal dialogs, held-down repeat keys, and modifier keys). Always ensure the listeners are unbound during scene teardown to prevent memory leaks.

@@ -60,8 +60,7 @@ export const normalizeSeed = (seed: string): string => {
 export const createRandomSeed = (): string => {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const bytes = new Uint8Array(8);
-  if (typeof crypto !== 'undefined') crypto.getRandomValues(bytes);
-  else bytes.forEach((_, index) => (bytes[index] = Math.floor(Math.random() * 256)));
+  globalThis.crypto.getRandomValues(bytes);
   const chars = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
   return `BENTO-${chars.slice(0, 4)}-${chars.slice(4, 8)}`;
 };

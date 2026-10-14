@@ -1,0 +1,4 @@
+## 2025-02-28 - Hidden Keyboard Shortcuts for Fixed-Width UI Elements
+
+**Learning:** Adding text hints to fixed-width icon buttons in a Phaser canvas can break the layout due to the lack of automatic CSS reflow.
+**Action:** Implement keyboard accessibility via silent event listeners (e.g., `keydown-U` mapped to the undo function) to enhance UX for power users and keyboard navigators without compromising the visual layout of constrained UI components.

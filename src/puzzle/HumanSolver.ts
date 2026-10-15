@@ -38,7 +38,13 @@ const matchingExists = (
 
   const candidates = domains.map((domain, cell) => {
     if (forced?.cell === cell) return [forced.piece];
-    return [...domain].filter((piece) => allowed.has(piece) && piece !== forced?.piece);
+    const filtered: PieceId[] = [];
+    for (const piece of domain) {
+      if (allowed.has(piece) && piece !== forced?.piece) {
+        filtered.push(piece);
+      }
+    }
+    return filtered;
   });
   if (candidates.some((items) => items.length === 0)) return false;
 
@@ -153,7 +159,7 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
       }
     }
 
-    for (const omittedAnimal of [...omittedAnimalCandidates]) {
+    for (const omittedAnimal of omittedAnimalCandidates) {
       if (!matchingExists(domains, piecesForOmittedAnimal(omittedAnimal))) {
         omittedAnimalCandidates.delete(omittedAnimal);
         familyEliminations += 1;
@@ -162,15 +168,22 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
     }
 
     for (let position = 0; position < 9; position += 1) {
-      for (const pieceId of [...domains[position]!]) {
-        const hasFamilySupport = [...omittedAnimalCandidates].some((omittedAnimal) =>
-          matchingExists(domains, piecesForOmittedAnimal(omittedAnimal), {
-            cell: position,
-            piece: pieceId,
-          }),
-        );
+      const domain = domains[position]!;
+      for (const pieceId of domain) {
+        let hasFamilySupport = false;
+        for (const omittedAnimal of omittedAnimalCandidates) {
+          if (
+            matchingExists(domains, piecesForOmittedAnimal(omittedAnimal), {
+              cell: position,
+              piece: pieceId,
+            })
+          ) {
+            hasFamilySupport = true;
+            break;
+          }
+        }
         if (!hasFamilySupport) {
-          domains[position]!.delete(pieceId);
+          domain.delete(pieceId);
           candidateEliminations += 1;
           changed = true;
         }

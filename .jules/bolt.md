@@ -1,0 +1,4 @@
+## 2025-02-23 - Constraint Solver Closure Allocations
+
+**Learning:** In high-frequency hot paths like the constraint solver and puzzle generation, functional array methods (`.some`, `.every`, `.filter`) and array spreads (`[...set]`) cause severe performance bottlenecks due to massive closure allocation and garbage collection pressure. These inner loops are executed thousands of times.
+**Action:** When working on deep algorithmic solvers or generators in this codebase, prioritize traditional `for` and `for...of` loops, iterating directly over data structures like `Set` instead of converting them to arrays first.

@@ -38,14 +38,14 @@ const matchingExists = (
 
   // ⚡ Bolt: Use traditional loop and pre-allocate array to avoid map chaining in hot path
   // Expected impact: ~10% reduction in execution time due to reduced closure allocation
-  const candidates = [];
+  const candidates: PieceId[][] = [];
   for (let i = 0; i < domains.length; i++) {
     if (forced?.cell === i) {
       candidates.push([forced.piece]);
       continue;
     }
-    const filtered = [];
-    for (const piece of domains[i]) {
+    const filtered: PieceId[] = [];
+    for (const piece of domains[i]!) {
       if (allowed.has(piece) && piece !== forced?.piece) {
         filtered.push(piece);
       }
@@ -57,7 +57,7 @@ const matchingExists = (
   // ⚡ Bolt: Reduce garbage collection pressure by pre-allocating the order array
   const order = new Array(candidates.length);
   for (let i = 0; i < candidates.length; i++) {
-    order[i] = { cell: i, size: candidates[i].length };
+    order[i] = { cell: i, size: candidates[i]!.length };
   }
   order.sort((first, second) => first.size - second.size);
 
@@ -66,7 +66,7 @@ const matchingExists = (
   const assign = (cell: number, visited: Set<PieceId>): boolean => {
     const items = candidates[cell]!;
     for (let i = 0; i < items.length; i++) {
-      const piece = items[i];
+      const piece = items[i]!;
       if (visited.has(piece)) continue;
       visited.add(piece);
       const previousCell = pieceOwner.get(piece);

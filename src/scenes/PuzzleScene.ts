@@ -126,6 +126,16 @@ export class PuzzleScene extends Phaser.Scene {
   private countdown?: Phaser.GameObjects.Container;
   private visibilityHandler?: () => void;
   private playContext: PlayContext = INFINITE_PLAY_CONTEXT;
+
+  private readonly handleShortcut = (event: KeyboardEvent): void => {
+    if (this.modal || document.activeElement?.tagName === 'INPUT' || event.repeat) return;
+
+    const key = event.key.toLowerCase();
+    if (key === 'u' || (key === 'z' && (event.ctrlKey || event.metaKey))) {
+      event.preventDefault();
+      this.undo();
+    }
+  };
   private launchContext?: PlayContext;
   private pendingCampaignContext?: PlayContext;
   private trackListenerCleanup?: () => void;
@@ -198,11 +208,14 @@ export class PuzzleScene extends Phaser.Scene {
     if (!firstVisit) this.announce(this.i18n.t('announce.ready'));
     this.visibilityHandler = () => this.handleVisibilityChange();
     document.addEventListener('visibilitychange', this.visibilityHandler);
+    this.input.keyboard?.on('keydown', this.handleShortcut);
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.elapsedTimer.pause();
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
         document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.input.keyboard?.off('keydown', this.handleShortcut);
     });
   }
 
@@ -1381,10 +1394,12 @@ export class PuzzleScene extends Phaser.Scene {
       : [];
     return [
       ...current,
-      ...this.save.gameHistory.map((entry): HistoryGameRow => ({
-        ...(entry as GameHistoryEntry),
-        current: false,
-      })),
+      ...this.save.gameHistory.map(
+        (entry): HistoryGameRow => ({
+          ...(entry as GameHistoryEntry),
+          current: false,
+        }),
+      ),
     ];
   }
 

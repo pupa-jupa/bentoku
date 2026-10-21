@@ -20,37 +20,67 @@ export const getClueOffsets = (clue: CluePattern): ClueOffset[] => {
 const positionAt = (cell: ClueCell, offset: ClueOffset): number =>
   (cell.y + offset.y) * 3 + cell.x + offset.x;
 
+// Performance optimization (Bolt): Avoiding array functional methods (some, every)
+// to prevent massive closure allocation and improve solver execution speed.
 export const clueCouldMatch = (
   board: Board,
   clue: CluePattern,
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean =>
-  getClueOffsets(clue).some((offset) =>
-    clue.cells.every((cell) => {
+): boolean => {
+  const offsets = getClueOffsets(clue);
+  for (let i = 0; i < offsets.length; i += 1) {
+    const offset = offsets[i]!;
+    let allMatch = true;
+    for (let j = 0; j < clue.cells.length; j += 1) {
+      const cell = clue.cells[j]!;
       const pieceId = board[positionAt(cell, offset)];
-      if (!pieceId || (!cell.animal && !cell.food)) return true;
+      if (!pieceId || (!cell.animal && !cell.food)) continue;
       const piece = pieceMap.get(pieceId);
-      return piece ? pieceMatchesCell(piece, cell) : false;
-    }),
-  );
+      if (!piece || !pieceMatchesCell(piece, cell)) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) return true;
+  }
+  return false;
+};
 
 export const clueMatchesBoard = (
   board: Board,
   clue: CluePattern,
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean =>
-  getClueOffsets(clue).some((offset) =>
-    clue.cells.every((cell) => {
-      if (!cell.animal && !cell.food) return true;
+): boolean => {
+  const offsets = getClueOffsets(clue);
+  for (let i = 0; i < offsets.length; i += 1) {
+    const offset = offsets[i]!;
+    let allMatch = true;
+    for (let j = 0; j < clue.cells.length; j += 1) {
+      const cell = clue.cells[j]!;
+      if (!cell.animal && !cell.food) continue;
       const pieceId = board[positionAt(cell, offset)];
-      if (!pieceId) return false;
+      if (!pieceId) {
+        allMatch = false;
+        break;
+      }
       const piece = pieceMap.get(pieceId);
-      return piece ? pieceMatchesCell(piece, cell) : false;
-    }),
-  );
+      if (!piece || !pieceMatchesCell(piece, cell)) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) return true;
+  }
+  return false;
+};
 
 export const boardSatisfiesPuzzle = (
   board: Board,
   clues: readonly CluePattern[],
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean => clues.every((clue) => clueMatchesBoard(board, clue, pieceMap));
+): boolean => {
+  for (let i = 0; i < clues.length; i += 1) {
+    if (!clueMatchesBoard(board, clues[i]!, pieceMap)) return false;
+  }
+  return true;
+};

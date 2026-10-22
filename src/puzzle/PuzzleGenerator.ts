@@ -188,11 +188,17 @@ const makeSpatialClue = (
   const profile = DIFFICULTY_PROFILES[difficulty];
   const originX = rng.int(4 - geometry.width);
   const originY = rng.int(4 - geometry.height);
-  const cells = geometry.cells.map(([x, y]) => {
+  const cells: ClueCell[] = [];
+  let visibleMarks = 0;
+  for (let i = 0; i < geometry.cells.length; i++) {
+    const [x, y] = geometry.cells[i]!;
     const pieceId = solution[(originY + y) * 3 + originX + x]!;
-    return revealFor(pieces.get(pieceId)!, rng, difficulty, x, y);
-  });
-  let visibleMarks = cells.filter((cell) => cell.animal || cell.food).length;
+    const cell = revealFor(pieces.get(pieceId)!, rng, difficulty, x, y);
+    cells.push(cell);
+    if (cell.animal || cell.food) {
+      visibleMarks++;
+    }
+  }
   for (let index = 0; visibleMarks < profile.minSpatialMarks && index < cells.length; index += 1) {
     const cell = cells[index]!;
     if (cell.animal || cell.food) continue;
@@ -243,11 +249,17 @@ const makeAnchorClue = (
   };
 };
 
-const cloneClue = (clue: CluePattern, id = clue.id): CluePattern => ({
-  ...clue,
-  id,
-  cells: clue.cells.map((cell) => ({ ...cell })),
-});
+const cloneClue = (clue: CluePattern, id = clue.id): CluePattern => {
+  const cells: ClueCell[] = [];
+  for (let i = 0; i < clue.cells.length; i++) {
+    cells.push({ ...clue.cells[i]! });
+  }
+  return {
+    ...clue,
+    id,
+    cells,
+  };
+};
 
 const exactAnchorAt = (
   anchor: CluePattern,
@@ -293,24 +305,38 @@ export class PuzzleGenerator {
 
     let anchor = makeAnchorClue(solutionIds, pieceMap, clueRng, difficulty);
     const selectedClues: CluePattern[] = [];
-    const eligibleGeometries = GEOMETRIES.filter(
-      (geometry) => geometry.cells.length >= DIFFICULTY_PROFILES[difficulty].minSpatialCells,
-    );
-    const geometries = clueRng.shuffle(
-      difficulty === 'master'
-        ? [...eligibleGeometries, ...clueRng.shuffle(eligibleGeometries)]
-        : [...eligibleGeometries, ...clueRng.shuffle(eligibleGeometries).slice(0, 5)],
-    );
-    const candidates = geometries.map((geometry, index) =>
-      makeSpatialClue(
-        solutionIds,
-        pieceMap,
-        geometry,
-        clueRng,
-        difficulty,
-        `candidate-${index + 1}`,
-      ),
-    );
+    const eligibleGeometries: Geometry[] = [];
+    for (let i = 0; i < GEOMETRIES.length; i++) {
+      if (GEOMETRIES[i]!.cells.length >= DIFFICULTY_PROFILES[difficulty].minSpatialCells) {
+        eligibleGeometries.push(GEOMETRIES[i]!);
+      }
+    }
+
+    const combinedGeometries: Geometry[] = [];
+    for (let i = 0; i < eligibleGeometries.length; i++) {
+      combinedGeometries.push(eligibleGeometries[i]!);
+    }
+
+    const shuffledEligible = clueRng.shuffle(eligibleGeometries);
+    const numToTake = difficulty === 'master' ? shuffledEligible.length : 5;
+    for (let i = 0; i < Math.min(numToTake, shuffledEligible.length); i++) {
+      combinedGeometries.push(shuffledEligible[i]!);
+    }
+
+    const geometries = clueRng.shuffle(combinedGeometries);
+    const candidates: CluePattern[] = [];
+    for (let i = 0; i < geometries.length; i++) {
+      candidates.push(
+        makeSpatialClue(
+          solutionIds,
+          pieceMap,
+          geometries[i]!,
+          clueRng,
+          difficulty,
+          `candidate-${i + 1}`,
+        ),
+      );
+    }
     let humanResult = solveHumanly({ pieces, clues: [anchor] });
     const profile = DIFFICULTY_PROFILES[difficulty];
 
@@ -346,14 +372,22 @@ export class PuzzleGenerator {
     }
 
     while (!humanResult.solved) {
-      const partialPositions = anchor.cells
-        .map((cell) => ({ cell, position: cell.y * 3 + cell.x }))
-        .filter(({ cell }) => !cell.animal || !cell.food)
-        .map(({ position }) => position);
-      const occupiedPositions = new Set(anchor.cells.map((cell) => cell.y * 3 + cell.x));
-      const missingPositions = Array.from({ length: 9 }, (_, position) => position).filter(
-        (position) => !occupiedPositions.has(position),
-      );
+      const partialPositions: number[] = [];
+      const occupiedPositions = new Set<number>();
+      for (let i = 0; i < anchor.cells.length; i++) {
+        const cell = anchor.cells[i]!;
+        const position = cell.y * 3 + cell.x;
+        occupiedPositions.add(position);
+        if (!cell.animal || !cell.food) {
+          partialPositions.push(position);
+        }
+      }
+      const missingPositions: number[] = [];
+      for (let position = 0; position < 9; position++) {
+        if (!occupiedPositions.has(position)) {
+          missingPositions.push(position);
+        }
+      }
       const unresolvedPositions =
         partialPositions.length > 0
           ? partialPositions
@@ -387,8 +421,12 @@ export class PuzzleGenerator {
     if (!humanResult.solved || exactResult.count !== 1) {
       throw new Error(`Unable to create a deductive, unique ${difficulty} puzzle for ${seed}.`);
     }
-    if (exactResult.firstSolution?.some((pieceId, index) => pieceId !== solution[index])) {
-      throw new Error(`Generated clues do not resolve to the intended solution for ${seed}.`);
+    if (exactResult.firstSolution) {
+      for (let i = 0; i < exactResult.firstSolution.length; i++) {
+        if (exactResult.firstSolution[i] !== solution[i]) {
+          throw new Error(`Generated clues do not resolve to the intended solution for ${seed}.`);
+        }
+      }
     }
 
     return {

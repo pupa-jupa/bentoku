@@ -129,6 +129,14 @@ export class PuzzleScene extends Phaser.Scene {
   private launchContext?: PlayContext;
   private pendingCampaignContext?: PlayContext;
   private trackListenerCleanup?: () => void;
+  private readonly keyboardUndoHandler = (event: KeyboardEvent): void => {
+    if (event.repeat || this.modal || document.activeElement?.tagName === 'INPUT') return;
+    const key = event.key.toLowerCase();
+    if (key === 'u' || (key === 'z' && (event.ctrlKey || event.metaKey))) {
+      event.preventDefault();
+      this.undo();
+    }
+  };
 
   constructor() {
     super('PuzzleScene');
@@ -198,11 +206,13 @@ export class PuzzleScene extends Phaser.Scene {
     if (!firstVisit) this.announce(this.i18n.t('announce.ready'));
     this.visibilityHandler = () => this.handleVisibilityChange();
     document.addEventListener('visibilitychange', this.visibilityHandler);
+    this.input.keyboard?.on('keydown', this.keyboardUndoHandler);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.elapsedTimer.pause();
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
         document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.input.keyboard?.off('keydown', this.keyboardUndoHandler);
     });
   }
 

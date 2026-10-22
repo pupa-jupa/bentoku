@@ -55,8 +55,8 @@ const solveForAnimals = (
   let initialUsedCount = 0;
   for (let i = 0; i < board.length; i++) {
     const cell = board[i];
-    if (cell !== null) {
-      used.add(cell);
+    if (cell !== null && cell !== undefined) {
+      used.add(cell as PieceId);
       initialUsedCount++;
     }
   }

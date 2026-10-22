@@ -303,7 +303,7 @@ export const solveHumanly = (puzzle: HumanPuzzle, initialBoard?: Board): HumanSo
   }
 
   const hasNineDistinctSingletons = allSingletonsValid && new Set(singletonIds).size === 9;
-  const candidateBoard = hasNineDistinctSingletons ? toBoard(singletonIds) : undefined;
+  const candidateBoard = hasNineDistinctSingletons ? toBoard(singletonIds as PieceId[]) : undefined;
   const solved = Boolean(
     candidateBoard &&
     omittedAnimalCandidates.size === 1 &&

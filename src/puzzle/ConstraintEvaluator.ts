@@ -24,33 +24,66 @@ export const clueCouldMatch = (
   board: Board,
   clue: CluePattern,
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean =>
-  getClueOffsets(clue).some((offset) =>
-    clue.cells.every((cell) => {
+): boolean => {
+  // ⚡ Bolt Optimization: Using standard for loops instead of .some() / .every() to avoid
+  // heavy closure allocations during hot-path execution, significantly improving GC performance
+  const offsets = getClueOffsets(clue);
+  for (let i = 0; i < offsets.length; i += 1) {
+    const offset = offsets[i]!;
+    let allCellsMatch = true;
+    for (let j = 0; j < clue.cells.length; j += 1) {
+      const cell = clue.cells[j]!;
       const pieceId = board[positionAt(cell, offset)];
-      if (!pieceId || (!cell.animal && !cell.food)) return true;
+      if (!pieceId || (!cell.animal && !cell.food)) continue;
       const piece = pieceMap.get(pieceId);
-      return piece ? pieceMatchesCell(piece, cell) : false;
-    }),
-  );
+      if (!piece || !pieceMatchesCell(piece, cell)) {
+        allCellsMatch = false;
+        break;
+      }
+    }
+    if (allCellsMatch) return true;
+  }
+  return false;
+};
 
 export const clueMatchesBoard = (
   board: Board,
   clue: CluePattern,
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean =>
-  getClueOffsets(clue).some((offset) =>
-    clue.cells.every((cell) => {
-      if (!cell.animal && !cell.food) return true;
+): boolean => {
+  // ⚡ Bolt Optimization: Replacing array methods with for loops to eliminate closure allocation
+  // and garbage collection overhead in this frequently called validation function
+  const offsets = getClueOffsets(clue);
+  for (let i = 0; i < offsets.length; i += 1) {
+    const offset = offsets[i]!;
+    let allCellsMatch = true;
+    for (let j = 0; j < clue.cells.length; j += 1) {
+      const cell = clue.cells[j]!;
+      if (!cell.animal && !cell.food) continue;
       const pieceId = board[positionAt(cell, offset)];
-      if (!pieceId) return false;
+      if (!pieceId) {
+        allCellsMatch = false;
+        break;
+      }
       const piece = pieceMap.get(pieceId);
-      return piece ? pieceMatchesCell(piece, cell) : false;
-    }),
-  );
+      if (!piece || !pieceMatchesCell(piece, cell)) {
+        allCellsMatch = false;
+        break;
+      }
+    }
+    if (allCellsMatch) return true;
+  }
+  return false;
+};
 
 export const boardSatisfiesPuzzle = (
   board: Board,
   clues: readonly CluePattern[],
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
-): boolean => clues.every((clue) => clueMatchesBoard(board, clue, pieceMap));
+): boolean => {
+  // ⚡ Bolt Optimization: Replacing .every() with a for loop to avoid closure allocation
+  for (let i = 0; i < clues.length; i += 1) {
+    if (!clueMatchesBoard(board, clues[i]!, pieceMap)) return false;
+  }
+  return true;
+};

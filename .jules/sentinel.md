@@ -1,4 +1,5 @@
 ## 2025-02-18 - Content Security Policy (CSP) Implementation for Vite/Phaser
+
 **Vulnerability:** Missing Content Security Policy (CSP) headers or meta tags in `index.html`, leaving the application exposed to baseline Cross-Site Scripting (XSS) and unintended third-party resource loading.
 **Learning:** When implementing a CSP for a Vite and Phaser-based frontend application, strict policies like `default-src 'self'` will break the application. Vite's development server (HMR) requires `connect-src ws: wss:`, and Phaser/Vite often require `'unsafe-inline'` for `script-src` and `style-src` to inject essential runtime assets.
 **Prevention:** Always include a baseline CSP in new frontend projects, but tailor it to the build tool's requirements (e.g., allowing WebSocket connections for Vite HMR) to ensure security enhancements do not break local development or production rendering.

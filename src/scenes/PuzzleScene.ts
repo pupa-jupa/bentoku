@@ -201,8 +201,10 @@ export class PuzzleScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.elapsedTimer.pause();
       if (!this.solved) this.saveCurrent();
+
       if (this.visibilityHandler)
         document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.input.keyboard?.off('keydown', this.undoKeyHandler);
     });
   }
 
@@ -455,7 +457,17 @@ export class PuzzleScene extends Phaser.Scene {
     );
   }
 
+  private undoKeyHandler = (event: KeyboardEvent): void => {
+    if (event.repeat || document.activeElement?.tagName === 'INPUT') return;
+    const key = event.key.toLowerCase();
+    if (key === 'u' || (key === 'z' && (event.ctrlKey || event.metaKey))) {
+      this.undo();
+    }
+  };
+
   private bindInput(): void {
+    this.input.keyboard?.on('keydown', this.undoKeyHandler);
+
     this.input.once('pointerdown', () =>
       getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume),
     );

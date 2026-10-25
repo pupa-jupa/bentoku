@@ -125,6 +125,7 @@ export class PuzzleScene extends Phaser.Scene {
   private timedOut = false;
   private countdown?: Phaser.GameObjects.Container;
   private visibilityHandler?: () => void;
+  private keyboardShortcutHandler?: (event: KeyboardEvent) => void;
   private playContext: PlayContext = INFINITE_PLAY_CONTEXT;
   private launchContext?: PlayContext;
   private pendingCampaignContext?: PlayContext;
@@ -198,11 +199,17 @@ export class PuzzleScene extends Phaser.Scene {
     if (!firstVisit) this.announce(this.i18n.t('announce.ready'));
     this.visibilityHandler = () => this.handleVisibilityChange();
     document.addEventListener('visibilitychange', this.visibilityHandler);
+
+    this.keyboardShortcutHandler = (event: KeyboardEvent) => this.handleKeyboardShortcut(event);
+    this.input.keyboard?.on('keydown', this.keyboardShortcutHandler);
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.elapsedTimer.pause();
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
         document.removeEventListener('visibilitychange', this.visibilityHandler);
+      if (this.keyboardShortcutHandler)
+        this.input.keyboard?.off('keydown', this.keyboardShortcutHandler);
     });
   }
 
@@ -1786,6 +1793,19 @@ export class PuzzleScene extends Phaser.Scene {
       undefined,
       false,
     );
+  }
+
+  private handleKeyboardShortcut(event: KeyboardEvent): void {
+    if (event.repeat) return;
+    if (document.activeElement?.tagName === 'INPUT') return;
+
+    const key = event.key.toLowerCase();
+    const isUndo = key === 'u' || ((event.ctrlKey || event.metaKey) && key === 'z');
+
+    if (isUndo) {
+      this.undo();
+      event.preventDefault();
+    }
   }
 
   private handleVisibilityChange(): void {

@@ -298,8 +298,8 @@ export class PuzzleGenerator {
     );
     const geometries = clueRng.shuffle(
       difficulty === 'master'
-        ? [...eligibleGeometries, ...clueRng.shuffle(eligibleGeometries)]
-        : [...eligibleGeometries, ...clueRng.shuffle(eligibleGeometries).slice(0, 5)],
+        ? eligibleGeometries.concat(clueRng.shuffle([...eligibleGeometries]))
+        : eligibleGeometries.concat(clueRng.shuffle([...eligibleGeometries]).slice(0, 5)),
     );
     const candidates = geometries.map((geometry, index) =>
       makeSpatialClue(

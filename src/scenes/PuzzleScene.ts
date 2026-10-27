@@ -120,6 +120,19 @@ export class PuzzleScene extends Phaser.Scene {
   private elapsedTimer = new ElapsedTimer();
   private attemptId = '';
   private attemptStartedAt = 0;
+  private readonly handleShortcut = (event: KeyboardEvent): void => {
+    if (
+      this.modal ||
+      ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') ||
+      event.repeat
+    )
+      return;
+    const key = event.key.toLowerCase();
+    if (key === 'z' || key === 'u') {
+      this.undo();
+    }
+  };
+
   private lastElapsedDisplaySecond = -1;
   private lastElapsedPersistedBucket = -1;
   private timedOut = false;
@@ -198,7 +211,9 @@ export class PuzzleScene extends Phaser.Scene {
     if (!firstVisit) this.announce(this.i18n.t('announce.ready'));
     this.visibilityHandler = () => this.handleVisibilityChange();
     document.addEventListener('visibilitychange', this.visibilityHandler);
+    this.input.keyboard?.on('keydown', this.handleShortcut);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown', this.handleShortcut);
       this.elapsedTimer.pause();
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)

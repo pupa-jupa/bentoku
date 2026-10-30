@@ -1,0 +1,4 @@
+## 2024-10-30 - Keyboard Shortcuts in Canvas Games
+
+**Learning:** When adding keyboard shortcuts for accessibility to a Phaser canvas game, we can't rely on typical HTML button DOM events. We must use global `keydown` event listeners while being careful to check for international keyboard layouts (via `event.key.toLowerCase()`), ensure we aren't rapidly triggering actions (via `event.repeat`), and confirm that no overlay modals are active or HTML inputs are focused (using `document.activeElement`).
+**Action:** Always implement silent keyboard event listeners directly on the Phaser input keyboard and unbind them during the scene's shutdown to avoid memory leaks. Check `event.key.toLowerCase()` rather than `event.code` for better internationalization, and verify `this.modal` and DOM focus before executing actions.

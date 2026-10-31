@@ -115,6 +115,8 @@ export class PuzzleScene extends Phaser.Scene {
   private tutorial?: TutorialController;
   private tutorialView?: TutorialView;
   private undoButton?: Phaser.GameObjects.Container;
+  private helpButton?: Phaser.GameObjects.Container;
+  private settingsButton?: Phaser.GameObjects.Container;
   private timer?: ChallengeTimer;
   private timerText?: Phaser.GameObjects.Text;
   private elapsedTimer = new ElapsedTimer();
@@ -361,7 +363,7 @@ export class PuzzleScene extends Phaser.Scene {
       sound: false,
       allowDuringTutorial: true,
     });
-    this.makeButton({
+    this.helpButton = this.makeButton({
       x: 1426,
       y: 54,
       width: 52,
@@ -370,7 +372,7 @@ export class PuzzleScene extends Phaser.Scene {
       icon: true,
       sound: false,
     });
-    this.makeButton({
+    this.settingsButton = this.makeButton({
       x: 1490,
       y: 54,
       width: 52,
@@ -456,6 +458,28 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private bindInput(): void {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.repeat ||
+        this.modal ||
+        this.countdown ||
+        ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '')
+      )
+        return;
+      const key = event.key.toLowerCase();
+      if ((key === 'u' || key === 'z') && this.undoButton) {
+        this.undoButton.emit('pointerdown');
+      } else if ((key === 'h' || key === '?') && this.helpButton) {
+        this.helpButton.emit('pointerdown');
+      } else if (key === 's' && this.settingsButton) {
+        this.settingsButton.emit('pointerdown');
+      }
+    };
+    this.input.keyboard?.on('keydown', handleKeyDown);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown', handleKeyDown);
+    });
+
     this.input.once('pointerdown', () =>
       getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume),
     );

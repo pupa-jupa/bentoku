@@ -130,6 +130,20 @@ export class PuzzleScene extends Phaser.Scene {
   private pendingCampaignContext?: PlayContext;
   private trackListenerCleanup?: () => void;
 
+  private readonly undoKeyHandler = (event: KeyboardEvent): void => {
+    if (
+      event.key.toLowerCase() !== 'z' ||
+      (!event.ctrlKey && !event.metaKey) ||
+      event.repeat ||
+      this.modal ||
+      ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '')
+    ) {
+      return;
+    }
+    event.preventDefault();
+    this.undo();
+  };
+
   constructor() {
     super('PuzzleScene');
   }
@@ -198,7 +212,10 @@ export class PuzzleScene extends Phaser.Scene {
     if (!firstVisit) this.announce(this.i18n.t('announce.ready'));
     this.visibilityHandler = () => this.handleVisibilityChange();
     document.addEventListener('visibilitychange', this.visibilityHandler);
+    this.input.keyboard?.on('keydown', this.undoKeyHandler);
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown', this.undoKeyHandler);
       this.elapsedTimer.pause();
       if (!this.solved) this.saveCurrent();
       if (this.visibilityHandler)
@@ -1381,10 +1398,12 @@ export class PuzzleScene extends Phaser.Scene {
       : [];
     return [
       ...current,
-      ...this.save.gameHistory.map((entry): HistoryGameRow => ({
-        ...(entry as GameHistoryEntry),
-        current: false,
-      })),
+      ...this.save.gameHistory.map(
+        (entry): HistoryGameRow => ({
+          ...(entry as GameHistoryEntry),
+          current: false,
+        }),
+      ),
     ];
   }
 

@@ -31,10 +31,10 @@ export const clueCouldMatch = (
 ): boolean => {
   const offsets = getClueOffsets(clue);
   for (let i = 0; i < offsets.length; i++) {
-    const offset = offsets[i];
+    const offset = offsets[i]!;
     let matches = true;
     for (let j = 0; j < clue.cells.length; j++) {
-      const cell = clue.cells[j];
+      const cell = clue.cells[j]!;
       if (!cell.animal && !cell.food) continue;
       const pieceId = board[(cell.y + offset.y) * 3 + cell.x + offset.x];
       if (!pieceId) continue;
@@ -62,10 +62,10 @@ export const clueMatchesBoard = (
 ): boolean => {
   const offsets = getClueOffsets(clue);
   for (let i = 0; i < offsets.length; i++) {
-    const offset = offsets[i];
+    const offset = offsets[i]!;
     let matches = true;
     for (let j = 0; j < clue.cells.length; j++) {
-      const cell = clue.cells[j];
+      const cell = clue.cells[j]!;
       if (!cell.animal && !cell.food) continue;
       const pieceId = board[(cell.y + offset.y) * 3 + cell.x + offset.x];
       if (!pieceId) {
@@ -95,7 +95,7 @@ export const boardSatisfiesPuzzle = (
   pieceMap: ReadonlyMap<PieceId, BentoPiece>,
 ): boolean => {
   for (let i = 0; i < clues.length; i++) {
-    if (!clueMatchesBoard(board, clues[i], pieceMap)) return false;
+    if (!clueMatchesBoard(board, clues[i]!, pieceMap)) return false;
   }
   return true;
 };

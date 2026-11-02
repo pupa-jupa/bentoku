@@ -68,13 +68,23 @@ const solveForAnimals = (
     }
   }
 
-  const allCluesPossible = (): boolean =>
-    puzzle.clues.every((clue) => clueCouldMatch(board, clue, pieceMap));
+  const allCluesPossible = (): boolean => {
+    for (let i = 0; i < puzzle.clues.length; i++) {
+      if (!clueCouldMatch(board, puzzle.clues[i]!, pieceMap)) return false;
+    }
+    return true;
+  };
 
-  const candidatesFor = (position: number): BentoPiece[] =>
-    availablePieces.filter(
-      (piece) => !used.has(piece.id) && pieceAllowedAt(piece, position, descriptors),
-    );
+  const candidatesFor = (position: number): BentoPiece[] => {
+    const candidates: BentoPiece[] = [];
+    for (let i = 0; i < availablePieces.length; i++) {
+      const piece = availablePieces[i]!;
+      if (!used.has(piece.id) && pieceAllowedAt(piece, position, descriptors)) {
+        candidates.push(piece);
+      }
+    }
+    return candidates;
+  };
 
   const search = (depth: number): void => {
     if (count >= limit) return;
@@ -104,7 +114,8 @@ const solveForAnimals = (
     if (nextCandidates.length === 1) metrics.forcedMoves += 1;
     else metrics.branchCount += 1;
 
-    for (const piece of nextCandidates) {
+    for (let i = 0; i < nextCandidates.length; i++) {
+      const piece = nextCandidates[i]!;
       metrics.exploredStates += 1;
       board[nextPosition] = piece.id;
       used.add(piece.id);

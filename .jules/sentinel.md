@@ -1,0 +1,5 @@
+## 2024-05-24 - Added Content Security Policy for Vite/Phaser App
+
+**Vulnerability:** Missing Content Security Policy (CSP) allowed potentially unconstrained resource loading, increasing the risk of XSS and data exfiltration.
+**Learning:** For a Phaser game built with Vite, a strict CSP is challenging. `script-src 'self' 'unsafe-inline'` and `style-src 'self' 'unsafe-inline'` are currently required due to Vite's dev server constraints and how Phaser handles WebGL context creation and DOM interactions. `img-src 'self' data: blob:` is crucial because Phaser generates internal textures using data URIs and loads some assets via blobs. `connect-src 'self' ws: wss:` is needed for Vite's HMR WebSocket connections. `media-src 'self' data: blob:` ensures audio works.
+**Prevention:** Always include a baseline CSP in single-page applications, even if it requires `unsafe-inline` to function. It still provides defense-in-depth against other types of external script injection or unexpected resource loading. Use End-to-End tests to verify CSP doesn't break critical game rendering or HMR.

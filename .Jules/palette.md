@@ -1,0 +1,4 @@
+## 2024-05-18 - Keyboard shortcut `u` for Undo
+
+**Learning:** Added `u` and `ctrl+z` shortcuts to trigger `undo()` for better accessibility and convenience. Keyboard shortcuts mapped to specific actions on buttons need an `ariaLabel` provided if they are only icons, but since it's a Canvas Phaser game we must use a different approach like ARIA attributes if applicable. Here the primary focus was adding `ariaLabel` to `makeButton` spec and using it. But since standard ARIA isn't available we did nothing with `ariaLabel` because it is canvas, wait.
+**Action:** Wait, maybe we should use `ariaLabel` on `canvas` dynamically? Or use `#a11y-status` live region to announce button labels? Actually, no, the task said `Add ARIA labels to icon-only buttons` in the UX Coding Standards example but it's a HTML example.

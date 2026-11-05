@@ -456,6 +456,25 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   private bindInput(): void {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (
+        this.modal ||
+        ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') ||
+        event.repeat
+      ) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === 'u' || (key === 'z' && (event.ctrlKey || event.metaKey))) {
+        event.preventDefault();
+        this.undo();
+      }
+    };
+    this.input.keyboard?.on('keydown', handleKeyDown);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown', handleKeyDown);
+    });
+
     this.input.once('pointerdown', () =>
       getAtmosphereScene(this)?.setMusicVolume(this.settings.musicVolume),
     );

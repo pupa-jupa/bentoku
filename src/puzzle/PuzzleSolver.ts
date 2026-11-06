@@ -73,7 +73,7 @@ const solveForAnimals = (
   // inside the highly recurrent search() recursive hot path.
   const allCluesPossible = (): boolean => {
     for (let i = 0; i < puzzle.clues.length; i++) {
-      if (!clueCouldMatch(board, puzzle.clues[i], pieceMap)) {
+      if (!clueCouldMatch(board, puzzle.clues[i]!, pieceMap)) {
         return false;
       }
     }

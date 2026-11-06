@@ -68,8 +68,17 @@ const solveForAnimals = (
     }
   }
 
-  const allCluesPossible = (): boolean =>
-    puzzle.clues.every((clue) => clueCouldMatch(board, clue, pieceMap));
+  // ⚡ Bolt Performance Optimization:
+  // Using a manual for-loop rather than .every() avoids closure allocations
+  // inside the highly recurrent search() recursive hot path.
+  const allCluesPossible = (): boolean => {
+    for (let i = 0; i < puzzle.clues.length; i++) {
+      if (!clueCouldMatch(board, puzzle.clues[i], pieceMap)) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   const candidatesFor = (position: number): BentoPiece[] =>
     availablePieces.filter(
